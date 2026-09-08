@@ -2,5 +2,10 @@ node_modules/
 dist/
 .vercel/
 .grok/
+.git/
+.tanstack/
+.node_modules.lock
+.project_id
+app-react/attachments/
 *.log
 .DS_Store

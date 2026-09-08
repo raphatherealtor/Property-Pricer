@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Property Pricer",
+      "hasCanvas": false,
+      "bodyTextLen": 2610,
+      "bodyTextHash": "61a8613d7152a9372eae0ee1bfadfb1aba5e2568b3c1c4b5e1279b2c587151b2",
+      "bodyTextPrefix": "Property Pricer ENGINE V1.6 VERIFIED Desk Screen Consumer HOT RE",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Property Pricer",
+      "hasCanvas": false,
+      "bodyTextLen": 933,
+      "bodyTextHash": "e195cf32913774e53ff8f3d8292719095c00b97e2a5e08dd2c31ecbd94a27211",
+      "bodyTextPrefix": "Property Pricer V1.6 VERIFIED Desk Screen Consumer HOT READ MEDI",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}
