@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!-- ============================================================================
+     deck_demo.html — standalone runner for deck_controller.js
+     ----------------------------------------------------------------------------
+     Open this file (or serve the folder and visit /deck_demo.html). Zero build,
+     zero dependencies — it only needs deck_controller.js + deck_tokens.css next
+     to it.
+
+       ◄ ► arrows ......... previous / next slide
+       d ................... toggle Desk / Screen mode
+       swipe ............... touch devices: horizontal swipe changes slide
+       drag the slider ..... bends the hazard curve live (hero slide)
+       ?selftest=1 .......... run the deterministic engine/DOM self-test
+
+     MERGE PATH: deck_slides.html holds the identical slide markup as a paste-in
+     fragment for property_pricer.html; deck_tokens.css aliases the design tokens.
+     ========================================================================= -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Real Estate Diagnostic Deck — v1.6 visual engine</title>
+  <link rel="stylesheet" href="deck_tokens.css" />
+</head>
+<body style="margin:0">
+
+  <div id="deck-root" class="deck-root mode-desk">
+
+    <!-- ======================= TOPBAR (controller chrome) ================ -->
+    <header class="deck-topbar">
+      <span class="deck-brand">Pricer Diagnostic</span>
+      <span class="deck-id">480 Redwood Ln · demo inputs · v1.6</span>
+      <div>
+        <p class="deck-kicker" id="deck-kicker"></p>
+        <h1 class="deck-title" id="deck-title" style="margin:0"></h1>
+      </div>
+      <span class="deck-pos" id="deck-pos">1 / 6</span>
+      <div class="deck-field" title="At-market value of the subject (backend output)">
+        <label for="in-baseline">Value $</label>
+        <input id="in-baseline" type="number" step="1000" inputmode="numeric" />
+      </div>
+      <div class="deck-field" title="Closed median days-on-market for the local market (backend output)">
+        <label for="in-dom">Closed med DOM (d)</label>
+        <input id="in-dom" type="number" step="1" inputmode="numeric" />
+      </div>
+      <button id="deck-mode-btn" class="deck-mode-btn" type="button" aria-pressed="false">Mode: Desk</button>
+      <span id="deck-mode-badge" hidden></span>
+    </header>
+
+    <main id="deck-stage" class="deck-stage" aria-label="Real estate diagnostic deck">
+      <section id="slide-0" class="deck-slide" role="group" aria-label="Stage 1 Search Brackets">
+        <header class="slide-head"><span class="slide-index">01</span><div><p class="kicker">Stage 1 · Demand Capture</p><h2>Search Brackets <span class="slide-sub">— who can afford this listing</span></h2></div></header>
+        <div class="slide-body split"><div class="panel"><h3>$50k grain demand · reachable from <span id="s0-ask" class="accent">—</span></h3><div id="s0-chart" class="grain-chart" aria-label="Search demand by price bracket"></div><p class="note">Each bar is one $50k search-cap bracket of in-market demand (households whose budget cap sits inside it). Checked bars are fully captured by the current ask; half-shaded = the ask splits the grain.</p></div><div class="panel stack"><h3>Capture readout</h3><div class="stat-row"><span>Captured demand</span><strong id="s0-captured">—</strong></div><div class="stat-row"><span>Share of in-market demand</span><strong id="s0-share">—</strong></div><div class="stat-row"><span>Ask lands in bracket</span><strong id="s0-bracket">—</strong></div><ul id="s0-list" class="mini-list"></ul></div></div>
+      </section>
+      <section id="slide-1" class="deck-slide" role="group" aria-label="Stage 2 Presentation Gap">
+        <header class="slide-head"><span class="slide-index">02</span><div><p class="kicker">Stage 2 · Staging vs Holdback</p><h2>The Presentation Gap <span class="slide-sub">— finish the story before pricing it</span></h2></div></header>
+        <div class="slide-body split"><div class="panel"><h3>Cost of showing the home finished</h3><div class="compare"><div class="compare-row"><span class="compare-label">Staging investment</span><div class="bar-track"><div id="s1-bar-staging" class="bar bar-accent" style="width:0%"></div></div><span class="compare-val"><strong id="s1-staging">—</strong> <small id="s1-staging-pct">—</small></span></div><div class="compare-row"><span class="compare-label">Replacement holdback</span><div class="bar-track"><div id="s1-bar-holdback" class="bar bar-danger" style="width:0%"></div></div><span class="compare-val"><strong id="s1-holdback">—</strong> <small id="s1-holdback-pct">—</small></span></div></div><p class="big-number">Holdback = <span id="s1-ratio" class="accent">—</span> × staging cost</p></div><div class="panel stack"><h3>Read</h3><p id="s1-verdict" class="verdict">—</p><ul class="mini-list"><li>The $30,400 figure is the engine's <em>scaled replacement holdback</em> — what buyers withhold when staging is absent.</li><li>Both bars are drawn against value so the ratio stays meaningful across price edits.</li><li>Staging spend is a demo quote — paste the real vendor bid before client use.</li></ul></div></div>
+      </section>
+      <section id="slide-2" class="deck-slide" role="group" aria-label="Stage 3 Hazard Curve"><header class="slide-head"><span class="slide-index">03</span><div><p class="kicker">Stage 3 · Live Survival Engine</p><h2>The Hazard Curve <span class="slide-sub">— bend the clock with the asking price</span></h2></div></header><div class="hero-toolbar"><div class="ask-box"><label for="h2-slider">Target asking price</label><div class="ask-readout"><output id="h2-price" for="h2-slider">—</output><span id="h2-ratio" class="chip chip-accent">—</span></div><input id="h2-slider" type="range" min="600000" max="750000" step="1000" value="700000" aria-label="Target asking price slider" /><div class="ask-ticks"><span>$600k</span><span id="h2-free-cap">—</span><span>$750k</span></div><p id="h2-cost-detail" class="fine">—</p></div><div class="stats-strip"><div class="stat-card"><span>Expected DOM</span><strong id="h2-stat-dom">—</strong></div><div class="stat-card"><span>Risk of 4+ months</span><strong id="h2-stat-risk">—</strong></div><div class="stat-card"><span>Offer ≤ 2 weeks</span><strong id="h2-stat-2wk">—</strong></div><div class="stat-card"><span>Cost of testing</span><strong id="h2-stat-cost">—</strong></div><div class="stat-card"><span>E[discount]</span><strong id="h2-stat-disc">—</strong></div><div class="stat-card kappa"><span>Warp κ<sub>t</sub> → κ<sub>eff</sub></span><strong id="h2-stat-kappa">—</strong></div></div></div><figure class="hero-fig"><svg id="h2-svg" class="hero-svg" viewBox="0 0 1040 380" role="img" aria-label="Survival curve bending with asking price"></svg><figcaption><span class="legend-swatch legend-active" id="h2-legend-active">—</span><span class="legend-swatch legend-ref" id="h2-legend-ref">—</span><span class="legend-swatch legend-120">red rule = 120 days (17.14 wk)</span></figcaption></figure></section>
+      <section id="slide-3" class="deck-slide" role="group" aria-label="Stage 3 Discount Bridge"><header class="slide-head"><span class="slide-index">04</span><div><p class="kicker">Stage 3 · Price Realization</p><h2>The Discount Bridge <span class="slide-sub">— from ask to expected offer to the stale tail</span></h2></div></header><div class="slide-body split"><div class="panel"><h3>Waterfall · <span class="accent" id="s3-ask">—</span></h3><div class="waterfall" aria-label="Discount waterfall"><div id="s3-col-ask" class="water-col-wrap"></div><div id="s3-col-offer" class="water-col-wrap"></div><div id="s3-col-stale" class="water-col-wrap"></div></div><p id="s3-dom-note" class="fine">—</p></div><div class="panel stack"><h3>Bridge steps</h3><div class="step"><span>Value → Expected offer</span><strong id="s3-d1">—</strong></div><div class="step"><span>Expected offer <span class="accent" id="s3-offer">—</span></span></div><div class="step"><span>→ Stale floor (120 d+)</span><strong id="s3-d2">—</strong></div><div class="step"><span>Stale floor <span class="accent" id="s3-stale">—</span></span></div><p class="note">E[discount] weights the 1.9% → 8.4% ramp by each week's sale probability under κ_eff, so an over-value ask dilates time and raises expected discount. The offer is anchored to value, not the ask — testing a price over value buys more discount and carry, not a higher expected sale.</p></div></div></section>
+      <section id="slide-4" class="deck-slide" role="group" aria-label="Stage 4 Escrow and Close"><header class="slide-head"><span class="slide-index">05</span><div><p class="kicker">Stage 4 · Repairs & Negotiation</p><h2>Escrow &amp; Close <span class="slide-sub">— fix first or price it in?</span></h2></div></header><div class="slide-body split"><div class="panel" id="s4-fix"><h3>Fix-First</h3><p class="note">—</p></div><div class="panel" id="s4-in"><h3>Price-It-In</h3><p class="note">—</p></div></div><p id="s4-verdict" class="verdict verdict-wide">—</p></section>
+      <section id="slide-5" class="deck-slide" role="group" aria-label="Decision Matrix"><header class="slide-head"><span class="slide-index">06</span><div><p class="kicker">Final · Recommendation</p><h2>The Decision Matrix <span class="slide-sub">— at-market vs ambitious, side by side</span></h2></div></header><div class="slide-body split"><div class="panel" id="s5-market"><h3>At-Market</h3><p class="note">—</p></div><div class="panel" id="s5-ambitious"><h3>Ambitious</h3><p class="note">—</p></div></div></section>
+    </main>
+
+    <footer class="deck-footer"><div id="deck-progress" class="deck-dots" role="tablist" aria-label="Slides"></div><div class="deck-hints"><kbd>◄</kbd> <kbd>►</kbd> slides · <kbd>d</kbd> desk/screen · swipe on touch</div></footer>
+  </div>
+
+  <pre id="__selftest" class="selftest" style="display:none"></pre>
+  <script src="deck_controller.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      function boot() { REPricerDeck.Deck.init(); if (/selftest/.test(window.location.search)) runSelfTest(); }
+      function runSelfTest() {
+        var host = document.getElementById('__selftest'); if (!host) return; host.style.display='block'; host.textContent='deck_controller v'+REPricerDeck.VERSION+' — self-test running…\n';
+        var lines=[], failed=0; function rec(name, ok, detail){ if(!ok) failed++; lines.push((ok?'PASS ':'FAIL ')+name+(detail?'  ['+detail+']':'')); }
+        REPricerDeck.SelfTest.run(function(name,ok,detail){ rec('math: '+name,ok,detail); });
+        try {
+          var slides=document.querySelectorAll('.deck-slide'); rec('DOM: 6 slides present',slides.length===6,'found '+slides.length);
+          var dots=document.querySelectorAll('.deck-dot'); rec('DOM: 6 progress dots',dots.length===6,'found '+dots.length);
+          var active=document.querySelectorAll('.deck-slide.is-active'); rec('DOM: exactly one active slide',active.length===1&&active[0].id==='slide-0','active='+(active[0]&&active[0].id));
+          var svg=document.getElementById('h2-svg'), path=document.getElementById('h2-path-active'); rec('SVG: hero rendered + active path has data',!!svg&&!!path&&path.getAttribute('d')&&path.getAttribute('d').indexOf('M')===0,(path&&path.getAttribute('d')||'').slice(0,24));
+          var domChip=document.getElementById('h2-stat-dom'); rec('SVG: Expected DOM readout live',!!domChip&&domChip.textContent!=='—',domChip&&domChip.textContent);
+          var bar=document.querySelectorAll('#h2-bars rect'); rec('SVG: week 1–3 fresh-window bars rendered',bar.length===3,'rects='+bar.length);
+          var cost=document.getElementById('h2-stat-cost'); rec('SVG: Cost of testing readout present',!!cost&&cost.textContent.length>0,cost&&cost.textContent);
+          var slider=document.getElementById('h2-slider'); rec('DOM: slider wired 600k–750k',!!slider&&slider.min==='600000'&&slider.max==='750000',slider&&slider.value);
+          var s5=document.getElementById('s5-market'); rec('DOM: decision matrix cards rendered',!!s5&&s5.querySelectorAll('.matrix-row').length>=4,s5?s5.querySelectorAll('.matrix-row').length+' rows':'no card');
+          document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})); var advanced=document.querySelectorAll('.deck-slide.is-active')[0]; rec('NAV: ArrowRight advances to slide 2',advanced&&advanced.id==='slide-1',advanced&&advanced.id);
+          document.dispatchEvent(new KeyboardEvent('keydown',{key:'d',bubbles:true})); var root=document.getElementById('deck-root'); rec('NAV: "d" toggles Desk → Screen mode',root.classList.contains('mode-screen')&&!root.classList.contains('mode-desk'),'classes='+root.className);
+          slider.value='750000'; slider.dispatchEvent(new Event('input',{bubbles:true})); var priceOut=document.getElementById('h2-price').textContent, kappaChip=document.getElementById('h2-stat-kappa').textContent; rec('LIVE: slider @ $750k updates readouts (κ_t → κ_eff)',priceOut.indexOf('750,000')!==-1&&/→/.test(kappaChip),priceOut+' | '+kappaChip);
+          var risk=parseFloat(document.getElementById('h2-stat-risk').textContent); rec('COHERENCE: P(>120d) < 50% at $750k (p50 < 120d)',!isNaN(risk)&&risk<50,'risk='+risk+'%');
+        } catch(err){ failed++; lines.push('FAIL DOM harness threw: '+err.message); }
+        lines.push('---'); lines.push(failed===0?'ALL CHECKS PASSED ('+lines.length+' assertions)':failed+' CHECK(S) FAILED — see FAIL lines above');
+        host.textContent=lines.join('\n')+'\n__SELFTEST__ '+(failed===0?'PASS':'FAIL')+' '+lines.length+' assertions\n';
+      }
+      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+    })();
+  </script>
+</body>
+</html>
