@@ -3,8 +3,9 @@ import { selfTestSummary } from "@/engine/selftest";
 import type { AppMode } from "@/engine/types";
 import { usePricer } from "@/store/pricer";
 import { cn } from "@/lib/utils";
-import { LayoutGrid, Presentation, UserRound, Printer } from "lucide-react";
+import { Cloud, LayoutGrid, Presentation, UserRound, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { CloudPanel } from "./saas/cloud-panel";
 import { Consumer } from "./consumer";
 import { Deck } from "./deck";
 import { Desk } from "./desk";
@@ -47,6 +48,7 @@ export function App({ autoSelfTest = false }: { autoSelfTest?: boolean }) {
   const cert = useMemo(() => selfTestSummary(), []);
   const verified = cert.passed === cert.total;
   const [selftestOpen, setSelftestOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
 
   useEffect(() => {
     if (autoSelfTest) setSelftestOpen(true);
@@ -76,6 +78,10 @@ export function App({ autoSelfTest = false }: { autoSelfTest?: boolean }) {
       if (e.key === "c" || e.key === "C") {
         e.preventDefault();
         setMode("consumer");
+      }
+      if (e.key === "w" || e.key === "W") {
+        e.preventDefault();
+        setCloudOpen((open) => !open);
       }
       if (e.key === "p" || e.key === "P") {
         e.preventDefault();
@@ -201,6 +207,16 @@ export function App({ autoSelfTest = false }: { autoSelfTest?: boolean }) {
             size="sm"
             variant={dark ? "ghost" : "secondary"}
             className={dark ? "text-dark-ink hover:bg-dark-panel" : undefined}
+            onClick={() => setCloudOpen(true)}
+            title="Saved scenarios, AI narratives, Figgy CRM, and install (W)"
+          >
+            <Cloud className="size-3.5" />
+            <span className="hidden sm:inline">Cloud</span>
+          </Button>
+          <Button
+            size="sm"
+            variant={dark ? "ghost" : "secondary"}
+            className={dark ? "text-dark-ink hover:bg-dark-panel" : undefined}
             onClick={() => window.print()}
           >
             <Printer className="size-3.5" />
@@ -213,6 +229,11 @@ export function App({ autoSelfTest = false }: { autoSelfTest?: boolean }) {
         {mode === "consumer" ? <Consumer out={out} /> : null}
 
         <SelfTestModal open={selftestOpen} onClose={() => setSelftestOpen(false)} />
+        <CloudPanel
+          open={cloudOpen}
+          onClose={() => setCloudOpen(false)}
+          out={out}
+        />
       </div>
       <PrintDoc out={out} intake={intake} stamp={stamp} />
     </>

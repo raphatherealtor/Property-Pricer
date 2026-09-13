@@ -1,0 +1,17 @@
+{
+  "note": "SHA-256 of every file in src/engine/. This SDK is locked: copy the behaviour, never edit it in place. Regenerate with `node scripts/check-locks.mjs --write-lock` only as a deliberate re-lock, after re-running the engine self-test.",
+  "algorithm": "sha256",
+  "directory": "src/engine",
+  "files": {
+    "compute.ts": "ee075da0a3e387b076b11d526ea360f59822314f458975190139673d071e720e",
+    "defaults.ts": "8f000d3b1f3abba93c4f48fe51c83463677b253526ff164ee063bba2ff17f66b",
+    "export.ts": "736f3f3cbc320e53e604ad32f43a0c5140157ef13db0849aea2e86de02b1d861",
+    "holdback.ts": "7763cf18e191dd7bf42f7cf600c9276daac150502108f7fd9d318c6ee4122d05",
+    "index.ts": "48cc1acf9988c9e498854698350d1f635af7df3c7a8fdb4c3798e9baa796cb07",
+    "kappa.ts": "f5420991d4250806c325bd3de78fd4b0fbf20d950f4c6b3a5dcd9227de8f7cdf",
+    "personas.ts": "ba15ac129019da771150d28830fbfff849269f3d2fb15a889a76f5f87f3162c7",
+    "selftest.ts": "1237117e78b8c79c4277a185fd8b6837d722144c3ab467c22ba1162d721107f9",
+    "survival.ts": "e2d866bf7bf5d8072b0f59dbd7a24fcd7142a7ce3eb152ae2a2a0cd068ce45b3",
+    "types.ts": "895317f815f4b96ee1dba9e637fdbd1f3ebffe2b91882439d2e6d13a65c328e3"
+  }
+}
