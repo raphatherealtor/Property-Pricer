@@ -166,6 +166,24 @@ All three share one JSON-RPC dispatcher (`src/lib/mcp/server.ts`), so they can
 never expose different tools. A client manifest ships at
 `/.well-known/property-pricer-mcp.json`.
 
+**Client onboarding & machine-readable spec** (public, read-only — no secrets)
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/mcp/clients/presets` | Catalog of AI-platform presets — ChatGPT, Claude, Grok, Mistral, Kimi, Z.ai, DeepSeek, generic MCP client, generic REST/OpenAPI client. |
+| `GET /api/mcp/clients/{id}/setup` | One preset's setup steps + copy-paste block (404 for an unknown id). |
+| `GET /api/openapi.json` | OpenAPI 3.1 for the MCP endpoint, the REST bridge and the onboarding routes. |
+
+Each preset carries a descriptive OAuth `client_id` (a public identifier, **not a
+secret**), allowed redirect-URI patterns, default scopes, its auth method
+(`public_pkce` unless the platform requires a confidential client) and setup
+instructions. The OpenAPI document declares two security schemes: `mcpOAuth`
+(OAuth 2.0 authorization code **with PKCE**) and `mcpBearer` (the static gateway
+token as a bearer header). The catalog lives in `src/lib/mcp/clients.ts`; the spec
+is generated from the live tool/resource/prompt registry by
+`src/lib/mcp/openapi.ts`, so it cannot drift. The bearer token appears only as the
+`YOUR_MCP_TOKEN` placeholder in anything served to a client.
+
 **Auth** — `Authorization: Bearer <token>`. Accepted in order: no token (only when
 `MCP_REQUIRE_AUTH=false`), the global `PROPERTY_PRICER_MCP_TOKEN` (owns one
 deterministic workspace), or a per-client token hashed in `mcp_clients` (scoped to
@@ -194,9 +212,10 @@ token (in-process fixed window; per-instance on serverless).
 `db/mcp-schema-v1.sql`, applied by `migrations/0003_mcp_gateway.sql`).
 
 The admin panel lives in the **Cloud → MCP** tab: endpoint URL + copy buttons
-(Claude Desktop config, generic config, bridge instructions), the tool list, a live
-smoke test through `price_scenario`, and the last ten calls. It never shows the
-token — only the `YOUR_MCP_TOKEN` placeholder.
+(Claude Desktop config, generic config, bridge instructions), per-platform
+onboarding cards (the nine presets, each with its own copy-paste setup), the tool
+list, a live smoke test through `price_scenario`, and the last ten calls. It never
+shows the token — only the `YOUR_MCP_TOKEN` placeholder.
 
 ---
 
@@ -224,8 +243,9 @@ untouched platform files remain — see below).
 | Client-bundle secret boundary | `test:guards` (part) | 11 |
 | Local-scenario store (`pricer.ts`) | `test:src` (part) | 11 |
 | Engine-grounded prompts | `test:src` (part) | 8 |
-| MCP tools / resources / prompts / dispatcher | `mcp:test` | 21 |
+| MCP tools / resources / prompts / dispatcher | `mcp:test` | 22 |
 | MCP contract (registry, auth, secrets, engine) | `mcp:test` | 11 |
+| MCP onboarding presets + OpenAPI 3.1 | `mcp:test` | 8 |
 | Platform src tests (pre-existing) | `test:src` (part) | 55 |
 
 **The enum-parity guard.** `check:locks` compares each Postgres `CHECK (col IN …)`

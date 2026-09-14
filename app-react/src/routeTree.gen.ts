@@ -10,15 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiOpenapiDotjsonRouteImport } from './routes/api/openapi[.]json'
 import { Route as ApiMcpIndexRouteImport } from './routes/api/mcp/index'
 import { Route as ApiMcpSplatRouteImport } from './routes/api/mcp/$'
 import { Route as ApiMcpMessagesRouteImport } from './routes/api/mcp/messages'
 import { Route as ApiMcpSseRouteImport } from './routes/api/mcp/sse'
 import { Route as ApiCrmFiggyWebhookRouteImport } from './routes/api/crm/figgy/webhook'
+import { Route as ApiMcpClientsPresetsRouteImport } from './routes/api/mcp/clients/presets'
+import { Route as ApiMcpClientsIdSetupRouteImport } from './routes/api/mcp/clients/$id/setup'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOpenapiDotjsonRoute = ApiOpenapiDotjsonRouteImport.update({
+  id: '/api/openapi.json',
+  path: '/api/openapi.json',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMcpIndexRoute = ApiMcpIndexRouteImport.update({
@@ -46,66 +54,97 @@ const ApiCrmFiggyWebhookRoute = ApiCrmFiggyWebhookRouteImport.update({
   path: '/api/crm/figgy/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMcpClientsPresetsRoute = ApiMcpClientsPresetsRouteImport.update({
+  id: '/api/mcp/clients/presets',
+  path: '/api/mcp/clients/presets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpClientsIdSetupRoute = ApiMcpClientsIdSetupRouteImport.update({
+  id: '/api/mcp/clients/$id/setup',
+  path: '/api/mcp/clients/$id/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
   '/api/mcp/': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
+  '/api/mcp/clients/presets': typeof ApiMcpClientsPresetsRoute
+  '/api/mcp/clients/$id/setup': typeof ApiMcpClientsIdSetupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
   '/api/mcp': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
+  '/api/mcp/clients/presets': typeof ApiMcpClientsPresetsRoute
+  '/api/mcp/clients/$id/setup': typeof ApiMcpClientsIdSetupRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
   '/api/mcp/': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
+  '/api/mcp/clients/presets': typeof ApiMcpClientsPresetsRoute
+  '/api/mcp/clients/$id/setup': typeof ApiMcpClientsIdSetupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/openapi.json'
     | '/api/mcp/$'
     | '/api/mcp/messages'
     | '/api/mcp/sse'
     | '/api/mcp/'
     | '/api/crm/figgy/webhook'
+    | '/api/mcp/clients/presets'
+    | '/api/mcp/clients/$id/setup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/openapi.json'
     | '/api/mcp/$'
     | '/api/mcp/messages'
     | '/api/mcp/sse'
     | '/api/mcp'
     | '/api/crm/figgy/webhook'
+    | '/api/mcp/clients/presets'
+    | '/api/mcp/clients/$id/setup'
   id:
     | '__root__'
     | '/'
+    | '/api/openapi.json'
     | '/api/mcp/$'
     | '/api/mcp/messages'
     | '/api/mcp/sse'
     | '/api/mcp/'
     | '/api/crm/figgy/webhook'
+    | '/api/mcp/clients/presets'
+    | '/api/mcp/clients/$id/setup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiOpenapiDotjsonRoute: typeof ApiOpenapiDotjsonRoute
   ApiMcpSplatRoute: typeof ApiMcpSplatRoute
   ApiMcpMessagesRoute: typeof ApiMcpMessagesRoute
   ApiMcpSseRoute: typeof ApiMcpSseRoute
   ApiMcpIndexRoute: typeof ApiMcpIndexRoute
   ApiCrmFiggyWebhookRoute: typeof ApiCrmFiggyWebhookRoute
+  ApiMcpClientsPresetsRoute: typeof ApiMcpClientsPresetsRoute
+  ApiMcpClientsIdSetupRoute: typeof ApiMcpClientsIdSetupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -115,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/openapi.json': {
+      id: '/api/openapi.json'
+      path: '/api/openapi.json'
+      fullPath: '/api/openapi.json'
+      preLoaderRoute: typeof ApiOpenapiDotjsonRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/mcp/': {
@@ -152,16 +198,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCrmFiggyWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mcp/clients/presets': {
+      id: '/api/mcp/clients/presets'
+      path: '/api/mcp/clients/presets'
+      fullPath: '/api/mcp/clients/presets'
+      preLoaderRoute: typeof ApiMcpClientsPresetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp/clients/$id/setup': {
+      id: '/api/mcp/clients/$id/setup'
+      path: '/api/mcp/clients/$id/setup'
+      fullPath: '/api/mcp/clients/$id/setup'
+      preLoaderRoute: typeof ApiMcpClientsIdSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiOpenapiDotjsonRoute: ApiOpenapiDotjsonRoute,
   ApiMcpSplatRoute: ApiMcpSplatRoute,
   ApiMcpMessagesRoute: ApiMcpMessagesRoute,
   ApiMcpSseRoute: ApiMcpSseRoute,
   ApiMcpIndexRoute: ApiMcpIndexRoute,
   ApiCrmFiggyWebhookRoute: ApiCrmFiggyWebhookRoute,
+  ApiMcpClientsPresetsRoute: ApiMcpClientsPresetsRoute,
+  ApiMcpClientsIdSetupRoute: ApiMcpClientsIdSetupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

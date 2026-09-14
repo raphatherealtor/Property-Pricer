@@ -5,8 +5,10 @@ import { usePricer } from "@/store/pricer";
 import { describeApiError } from "@/lib/api/client-error";
 import {
   getMcpStatus,
+  listMcpClientPresets,
   listRecentMcpCalls,
   testMcpPriceScenario,
+  type ClientPresetDto,
   type McpCallDto,
   type McpStatusDto,
 } from "@/lib/api/mcp";
@@ -30,6 +32,7 @@ export function McpConnect() {
 
   const [status, setStatus] = useState<McpStatusDto | null>(null);
   const [calls, setCalls] = useState<McpCallDto[] | null>(null);
+  const [presets, setPresets] = useState<ClientPresetDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -41,13 +44,19 @@ export function McpConnect() {
 
   const refresh = async () => {
     try {
-      const [s, c] = await Promise.all([getMcpStatus(), listRecentMcpCalls()]);
+      const [s, c, p] = await Promise.all([
+        getMcpStatus(),
+        listRecentMcpCalls(),
+        listMcpClientPresets(),
+      ]);
       setStatus(s);
       setCalls(c);
+      setPresets(p);
       setError(null);
     } catch (err) {
       setStatus(null);
       setCalls(null);
+      setPresets(null);
       setError(describeApiError(err).message);
     }
   };
@@ -199,6 +208,60 @@ export function McpConnect() {
             {copied === "bridge" ? "Copied" : "Bridge instructions"}
           </Button>
         </div>
+      </SaasSection>
+
+      <SaasSection
+        title="Platform onboarding"
+        hint="Copy-paste setup for each AI platform. OAuth presets are public metadata — no platform secret ever leaves the server."
+      >
+        {presets === null ? (
+          <Muted>Loading presets…</Muted>
+        ) : (
+          <div className="grid gap-2">
+            {presets.map((preset) => (
+              <div key={preset.id} className="rounded-md border border-line bg-panel p-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-2xs font-medium text-ink">{preset.displayName}</p>
+                    <p className="mt-0.5 text-2xs leading-snug text-ink-2">{preset.description}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Tag tone="info">{preset.transport === "mcp" ? "MCP" : "REST"}</Tag>
+                    <Tag tone="info">{preset.authMethod === "public_pkce" ? "public PKCE" : "confidential"}</Tag>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => copy(`preset-${preset.id}`, preset.configSnippet)}
+                    >
+                      <Copy className="size-3.5" />
+                      {copied === `preset-${preset.id}` ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                </div>
+                <details className="mt-1.5">
+                  <summary className="cursor-pointer text-2xs font-medium text-ink-2">
+                    Setup instructions · redirects · scopes
+                  </summary>
+                  <pre className="mt-1.5 overflow-x-auto whitespace-pre-wrap rounded-md border border-line bg-panel-2 p-2 text-2xs leading-snug text-ink-2">
+                    {preset.setupInstructions}
+                  </pre>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {preset.allowedRedirectUriPatterns.map((uri) => (
+                      <Tag key={uri} tone="info">
+                        {uri}
+                      </Tag>
+                    ))}
+                    {preset.defaultScopes.map((scope) => (
+                      <Tag key={scope} tone="info">
+                        {scope}
+                      </Tag>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            ))}
+          </div>
+        )}
       </SaasSection>
 
       <SaasSection title="Enabled tools" hint="The full tool surface the MCP endpoint exposes.">

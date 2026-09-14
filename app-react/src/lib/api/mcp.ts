@@ -8,6 +8,9 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { cloudMiddleware } from "./context.ts";
+import type { ClientPresetDto } from "../mcp/clients.ts";
+
+export type { ClientPresetDto };
 
 export type McpToolInfo = { name: string; description: string };
 
@@ -82,6 +85,15 @@ export const listRecentMcpCalls = createServerFn({ method: "POST" })
           : String(row.created_at),
     }));
   });
+
+/** The AI-platform onboarding presets (public catalog; no secrets). */
+export const listMcpClientPresets = createServerFn({ method: "POST" }).handler(
+  async (): Promise<ClientPresetDto[]> => {
+    const { listClientPresets } = await import("../mcp/clients.ts");
+    const { mcpPublicBaseUrl } = await import("../mcp/auth.ts");
+    return listClientPresets(mcpPublicBaseUrl() || "https://YOUR_DOMAIN");
+  },
+);
 
 /** Run a real price through the MCP tool path (server-side), from supplied inputs. */
 export const testMcpPriceScenario = createServerFn({ method: "POST" })
