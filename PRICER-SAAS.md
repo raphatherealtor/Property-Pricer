@@ -1,13 +1,14 @@
-# Property Pricer — PWA + API-backed SaaS shell
+# Property Pricer — PWA + API-backed SaaS shell + MCP server
 
-Three layers sit on top of the existing React/Vite pricing app, which stays where
+Four layers sit on top of the existing React/Vite pricing app, which stays where
 it is under `app-react/`. Nothing in `src/engine/` was modified.
 
 | Layer | Lives in | What it does |
 |---|---|---|
 | **Installable PWA** | `app-react/public/` (`manifest.webmanifest`, `sw.js`, `icons/`), `app-react/src/lib/pwa/`, `app-react/src/components/saas/pwa-boot.tsx` | Installable on desktop, iPhone and Android; offline app shell; the last local scenario survives reloads and dropped connections |
 | **Backend API** | `db/app-schema-v1.sql`, `app-react/migrations/`, `app-react/src/lib/api/`, `app-react/src/lib/crypto/` | Users, workspaces, properties, saved scenarios + history, exports, AI runs, CRM connections and sync logs |
-| **AI + CRM** | `app-react/src/lib/ai/`, `app-react/src/lib/crm/`, `app-react/src/routes/api/crm/figgy/webhook.ts` | OpenAI / Anthropic Claude / Grok / Mistral through server routes, plus the Figgy AI CRM connector (outbound push + signed inbound webhook) |
+| **AI + CRM** | `app-react/src/lib/ai/`, `app-react/src/lib/crm/`, `app-react/src/routes/api/crm/figgy/webhook.ts` | OpenAI / Anthropic Claude / Grok / Mistral (plus Kimi/DeepSeek via env) through server routes, plus the Figgy AI CRM connector (outbound push + signed inbound webhook) |
+| **MCP server** | `app-react/src/lib/mcp/`, `app-react/src/routes/api/mcp/`, `app-react/public/.well-known/property-pricer-mcp.json` | A Model Context Protocol server (Streamable HTTP + SSE + REST bridge) exposing the locked engine as 15 tools, 8 resources and 6 prompts to any LLM client |
 
 ---
 
@@ -63,7 +64,11 @@ All optional; every one is read server-side only.
 | `DATABASE_URL` | Neon/Postgres connection. Unset → embedded PGlite (dev/preview). |
 | `APP_ENCRYPTION_KEY` | 32+ byte hex/base64/text key for the credential vault. Falls back to `BETTER_AUTH_SECRET`, then to a process-local key (reported as non-durable in the Install tab). |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROK_API_KEY` / `XAI_API_KEY`, `MISTRAL_API_KEY` | Server-side fallback keys, so a workspace can run without storing a key. |
+| `KIMI_API_KEY` / `MOONSHOT_API_KEY`, `DEEPSEEK_API_KEY` | Server-side fallback keys for the two extra MCP-only vendors (OpenAI-compatible; not in the DB `ai_providers` enum). |
 | `FIGGY_API_KEY`, `FIGGY_BASE_URL`, `FIGGY_SCENARIO_PATH` | Figgy CRM fallback key, base URL (default `https://api.figgy.ai`) and push path (default `/api/v1/scenarios`). |
+| `PROPERTY_PRICER_MCP_TOKEN` | The global MCP bearer token. Unset → no global gateway token (per-client tokens in `mcp_clients` still work). |
+| `MCP_REQUIRE_AUTH` | `"false"` to allow anonymous MCP reads; any other value (the default) requires a bearer token. |
+| `MCP_PUBLIC_BASE_URL` | Optional absolute base URL advertised to LLM clients when the request host is not the public host. |
 
 Set `APP_ENCRYPTION_KEY` before storing any credential in a real deployment —
 without it the vault key is process-local and stored keys stop decrypting after a
@@ -142,6 +147,59 @@ traced back to an engine version and input hash.
 
 ---
 
+## 5.5 MCP server
+
+Property Pricer is an MCP server: any MCP-capable client (ChatGPT, Claude, Grok,
+Mistral, Kimi, DeepSeek, local agents) connects to it and calls the locked engine
+through one canonical tool layer — the AI/CRM layers underneath are not special in
+MCP tool logic.
+
+**Transports**
+
+| Transport | Endpoint |
+|---|---|
+| Streamable HTTP (canonical) | `POST /api/mcp` |
+| SSE handshake + messages | `GET /api/mcp/sse`, `POST /api/mcp/messages` |
+| REST bridge (non-MCP clients) | `POST /api/mcp/tools/list`, `POST /api/mcp/tools/call`, `GET /api/mcp/resources/list`, `POST /api/mcp/resources/read`, `GET /api/mcp/prompts/list`, `POST /api/mcp/prompts/get` |
+
+All three share one JSON-RPC dispatcher (`src/lib/mcp/server.ts`), so they can
+never expose different tools. A client manifest ships at
+`/.well-known/property-pricer-mcp.json`.
+
+**Auth** — `Authorization: Bearer <token>`. Accepted in order: no token (only when
+`MCP_REQUIRE_AUTH=false`), the global `PROPERTY_PRICER_MCP_TOKEN` (owns one
+deterministic workspace), or a per-client token hashed in `mcp_clients` (scoped to
+one workspace). Rejection happens before any tool runs.
+
+**Tools** (15) — `price_scenario`, `validate_inputs`, `suggest_inputs_from_text`,
+`apply_input_patch`, `explain_math`, `save_scenario`, `load_scenario`,
+`list_scenarios`, `compare_scenarios`, `generate_client_summary`,
+`generate_risk_review`, `push_scenario_to_figgy`, `draft_crm_followup`,
+`export_scenario`, `get_app_capabilities`. Every tool validates with zod, returns
+structured JSON, never returns secrets, and re-runs the engine server-side when
+pricing is needed.
+
+**Resources** (6 + 2 templates) — engine contract, personas, input schema, output
+schema, client-explanation guide, Figgy contract, plus
+`property-pricer://scenario/{scenarioId}` and `…/engine-output` (templates).
+
+**Prompts** (6) — `seller_pricing_summary`, `listing_agent_strategy`,
+`lender_risk_review`, `investor_memo`, `commercial_broker_memo`, `figgy_crm_note`.
+Each embeds the engine's own fact sheet so the client has the exact numbers to use.
+
+**Rate limits** — 60 general, 10 AI-generating, and 5 Figgy calls per minute per
+token (in-process fixed window; per-instance on serverless).
+
+**Audit** — every accepted/rejected call is written to `mcp_calls` (schema in
+`db/mcp-schema-v1.sql`, applied by `migrations/0003_mcp_gateway.sql`).
+
+The admin panel lives in the **Cloud → MCP** tab: endpoint URL + copy buttons
+(Claude Desktop config, generic config, bridge instructions), the tool list, a live
+smoke test through `price_scenario`, and the last ten calls. It never shows the
+token — only the `YOUR_MCP_TOKEN` placeholder.
+
+---
+
 ## 6. Verify
 
 ```bash
@@ -151,6 +209,8 @@ npm run typecheck
 npm test           # the guard suites plus the guarded src tests
 npm run verify     # check + typecheck + test, in order
 npm run build      # vite build + db:migrate
+npm run mcp:inspect   # print the tool/resource/prompt registry
+npm run verify:mcp    # mcp tests + secrets + locks
 ```
 
 Current state: `npm run verify` and `npm run build` both exit 0. `npm run lint`
@@ -164,14 +224,24 @@ untouched platform files remain — see below).
 | Client-bundle secret boundary | `test:guards` (part) | 11 |
 | Local-scenario store (`pricer.ts`) | `test:src` (part) | 11 |
 | Engine-grounded prompts | `test:src` (part) | 8 |
+| MCP tools / resources / prompts / dispatcher | `mcp:test` | 21 |
+| MCP contract (registry, auth, secrets, engine) | `mcp:test` | 11 |
 | Platform src tests (pre-existing) | `test:src` (part) | 55 |
 
 **The enum-parity guard.** `check:locks` compares each Postgres `CHECK (col IN …)`
 constraint against the app enum that mirrors it, and (for personas) against the
-locked engine's `Persona` union. A compile-time assertion in the wire schema can
-prove the TypeScript enums agree, but nothing else proves the *database* does — and
-a persona added to the engine and UI but not the DDL inserts fine in dev and fails
-in production. Note this check reads `src/engine/types.ts`; it does not write it.
+locked engine's `Persona` union — including the MCP `client_type` and `status`
+checks against `src/lib/mcp/schemas.ts`. A compile-time assertion in the wire
+schema can prove the TypeScript enums agree, but nothing else proves the *database*
+does — and a persona added to the engine and UI but not the DDL inserts fine in dev
+and fails in production. Note this check reads `src/engine/types.ts`; it does not
+write it.
+
+**The MCP audit row.** `mcp_calls` is written on every accepted/rejected call. The
+unit tests assert the DDL and the dispatcher's audit wiring; the row *insert* runs
+against the real database in the built/deployed app, because the platform's DB
+layer uses Vite's `import.meta.glob` for migrations and therefore cannot boot under
+Node's test runner.
 
 **Why `npm test` is not `npm run test:all`.** This checkout is a front-end hand-off
 package: it ships no `.grok/` directory, no `AGENTS.md`, and no `SKILL.md`, and

@@ -10,11 +10,35 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiMcpIndexRouteImport } from './routes/api/mcp/index'
+import { Route as ApiMcpSplatRouteImport } from './routes/api/mcp/$'
+import { Route as ApiMcpMessagesRouteImport } from './routes/api/mcp/messages'
+import { Route as ApiMcpSseRouteImport } from './routes/api/mcp/sse'
 import { Route as ApiCrmFiggyWebhookRouteImport } from './routes/api/crm/figgy/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpIndexRoute = ApiMcpIndexRouteImport.update({
+  id: '/api/mcp/',
+  path: '/api/mcp/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpSplatRoute = ApiMcpSplatRouteImport.update({
+  id: '/api/mcp/$',
+  path: '/api/mcp/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpMessagesRoute = ApiMcpMessagesRouteImport.update({
+  id: '/api/mcp/messages',
+  path: '/api/mcp/messages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpSseRoute = ApiMcpSseRouteImport.update({
+  id: '/api/mcp/sse',
+  path: '/api/mcp/sse',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCrmFiggyWebhookRoute = ApiCrmFiggyWebhookRouteImport.update({
@@ -25,27 +49,62 @@ const ApiCrmFiggyWebhookRoute = ApiCrmFiggyWebhookRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/mcp/$': typeof ApiMcpSplatRoute
+  '/api/mcp/messages': typeof ApiMcpMessagesRoute
+  '/api/mcp/sse': typeof ApiMcpSseRoute
+  '/api/mcp/': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/mcp/$': typeof ApiMcpSplatRoute
+  '/api/mcp/messages': typeof ApiMcpMessagesRoute
+  '/api/mcp/sse': typeof ApiMcpSseRoute
+  '/api/mcp': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/mcp/$': typeof ApiMcpSplatRoute
+  '/api/mcp/messages': typeof ApiMcpMessagesRoute
+  '/api/mcp/sse': typeof ApiMcpSseRoute
+  '/api/mcp/': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/crm/figgy/webhook'
+  fullPaths:
+    | '/'
+    | '/api/mcp/$'
+    | '/api/mcp/messages'
+    | '/api/mcp/sse'
+    | '/api/mcp/'
+    | '/api/crm/figgy/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/crm/figgy/webhook'
-  id: '__root__' | '/' | '/api/crm/figgy/webhook'
+  to:
+    | '/'
+    | '/api/mcp/$'
+    | '/api/mcp/messages'
+    | '/api/mcp/sse'
+    | '/api/mcp'
+    | '/api/crm/figgy/webhook'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/mcp/$'
+    | '/api/mcp/messages'
+    | '/api/mcp/sse'
+    | '/api/mcp/'
+    | '/api/crm/figgy/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiMcpSplatRoute: typeof ApiMcpSplatRoute
+  ApiMcpMessagesRoute: typeof ApiMcpMessagesRoute
+  ApiMcpSseRoute: typeof ApiMcpSseRoute
+  ApiMcpIndexRoute: typeof ApiMcpIndexRoute
   ApiCrmFiggyWebhookRoute: typeof ApiCrmFiggyWebhookRoute
 }
 
@@ -56,6 +115,34 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp/': {
+      id: '/api/mcp/'
+      path: '/api/mcp'
+      fullPath: '/api/mcp/'
+      preLoaderRoute: typeof ApiMcpIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp/$': {
+      id: '/api/mcp/$'
+      path: '/api/mcp/$'
+      fullPath: '/api/mcp/$'
+      preLoaderRoute: typeof ApiMcpSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp/messages': {
+      id: '/api/mcp/messages'
+      path: '/api/mcp/messages'
+      fullPath: '/api/mcp/messages'
+      preLoaderRoute: typeof ApiMcpMessagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp/sse': {
+      id: '/api/mcp/sse'
+      path: '/api/mcp/sse'
+      fullPath: '/api/mcp/sse'
+      preLoaderRoute: typeof ApiMcpSseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/crm/figgy/webhook': {
@@ -70,6 +157,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiMcpSplatRoute: ApiMcpSplatRoute,
+  ApiMcpMessagesRoute: ApiMcpMessagesRoute,
+  ApiMcpSseRoute: ApiMcpSseRoute,
+  ApiMcpIndexRoute: ApiMcpIndexRoute,
   ApiCrmFiggyWebhookRoute: ApiCrmFiggyWebhookRoute,
 }
 export const routeTree = rootRouteImport

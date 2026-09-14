@@ -1153,3 +1153,132 @@ export async function listCrmSyncEvents(
     createdAt: iso(row.created_at),
   }));
 }
+
+/* ------------------------------------------------------------------ *
+ * MCP gateway: client registry + call audit
+ * ------------------------------------------------------------------ */
+
+export type McpClientRow = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  client_type: string;
+  token_hash: string | null;
+  is_enabled: boolean;
+  created_at: unknown;
+};
+
+export type McpCallRow = {
+  id: string;
+  workspace_id: string | null;
+  client_id: string | null;
+  user_id: string | null;
+  client_name: string | null;
+  client_version: string | null;
+  tool_name: string | null;
+  resource_uri: string | null;
+  prompt_name: string | null;
+  status: "succeeded" | "failed" | "rejected";
+  error: string | null;
+  created_at: unknown;
+};
+
+/** Resolve an MCP client by its hashed token, returning the client row only. */
+export async function findMcpClientByTokenHash(
+  tokenHash: string,
+): Promise<McpClientRow | null> {
+  const sql = await getSql();
+  const rows = await sql<McpClientRow>`
+    select id, workspace_id, name, client_type, token_hash, is_enabled, created_at
+    from mcp_clients
+    where token_hash = ${tokenHash}
+      and is_enabled = true
+    limit 1
+  `;
+  return rows[0] ?? null;
+}
+
+/** A workspace-scoped context built from a workspace id (no auth identity). */
+export async function workspaceContextById(
+  workspaceId: string,
+): Promise<WorkspaceContext | null> {
+  if (!isUuid(workspaceId)) return null;
+  const sql = await getSql();
+  const rows = await sql<{
+    id: string;
+    name: string;
+    owner_user_id: string;
+    owner_email: string;
+    owner_display_name: string | null;
+  }>`
+    select w.id, w.name, w.owner_user_id,
+           u.email as owner_email, u.display_name as owner_display_name
+    from workspaces w
+    join users u on u.id = w.owner_user_id
+    where w.id = ${workspaceId}
+    limit 1
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    userId: row.owner_user_id,
+    workspaceId: row.id,
+    workspaceName: row.name,
+    email: row.owner_email,
+    displayName: row.owner_display_name,
+  };
+}
+
+/** Record one MCP call for the audit log. Never throws (audit must not break a call). */
+export async function recordMcpCall(args: {
+  workspaceId?: string | null;
+  clientId?: string | null;
+  userId?: string | null;
+  clientName?: string | null;
+  clientVersion?: string | null;
+  toolName?: string | null;
+  resourceUri?: string | null;
+  promptName?: string | null;
+  request?: unknown;
+  response?: unknown;
+  status: "succeeded" | "failed" | "rejected";
+  error?: string | null;
+}): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    insert into mcp_calls (
+      workspace_id, client_id, user_id, client_name, client_version,
+      tool_name, resource_uri, prompt_name, request_json, response_json,
+      status, error
+    ) values (
+      ${isUuid(args.workspaceId ?? undefined) ? args.workspaceId : null}::uuid,
+      ${isUuid(args.clientId ?? undefined) ? args.clientId : null}::uuid,
+      ${isUuid(args.userId ?? undefined) ? args.userId : null}::uuid,
+      ${args.clientName ?? null},
+      ${args.clientVersion ?? null},
+      ${args.toolName ?? null},
+      ${args.resourceUri ?? null},
+      ${args.promptName ?? null},
+      ${jsonParam(args.request ?? null)}::jsonb,
+      ${jsonParam(truncateForLog(args.response))}::jsonb,
+      ${args.status},
+      ${args.error ?? null}
+    )
+  `;
+}
+
+/** The last N MCP calls for a workspace (admin panel). */
+export async function listRecentMcpCalls(
+  ctx: WorkspaceContext,
+  limit: number,
+): Promise<McpCallRow[]> {
+  const sql = await getSql();
+  return sql<McpCallRow>`
+    select id, workspace_id, client_id, user_id, client_name, client_version,
+           tool_name, resource_uri, prompt_name, status, error, created_at
+    from mcp_calls
+    where workspace_id = ${ctx.workspaceId}
+    order by created_at desc
+    limit ${limit}
+  `;
+}

@@ -1,0 +1,26 @@
+{
+  "name": "Property Pricer MCP",
+  "description": "Real estate diagnostic pricing MCP server with locked v1.6 engine.",
+  "version": "1.0.0",
+  "mcp": {
+    "endpoint": "/api/mcp",
+    "sse": "/api/mcp/sse"
+  },
+  "restBridge": {
+    "toolsList": "/api/mcp/tools/list",
+    "toolsCall": "/api/mcp/tools/call",
+    "resourcesList": "/api/mcp/resources/list",
+    "resourcesRead": "/api/mcp/resources/read",
+    "promptsList": "/api/mcp/prompts/list",
+    "promptsGet": "/api/mcp/prompts/get"
+  },
+  "auth": {
+    "type": "bearer"
+  },
+  "capabilities": {
+    "tools": true,
+    "resources": true,
+    "prompts": true,
+    "logging": true
+  }
+}

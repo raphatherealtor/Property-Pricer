@@ -31,9 +31,16 @@ export const FORBIDDEN_CLIENT_HOSTS = [
   "api.x.ai",
   "api.mistral.ai",
   "api.figgy.ai",
+  "api.moonshot.ai",
+  "api.deepseek.com",
 ];
 
-/** Env vars whose *names* must not appear in client code. */
+/**
+ * Env vars whose *names* must not appear in client code. This includes secrets
+ * (API keys, the MCP bearer token, the encryption key) AND server-only config the
+ * frontend must learn through a server function rather than bake in (the MCP
+ * public base URL and whether auth is required).
+ */
 export const FORBIDDEN_CLIENT_ENV = [
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
@@ -41,10 +48,16 @@ export const FORBIDDEN_CLIENT_ENV = [
   "GROK_API_KEY",
   "XAI_API_KEY",
   "MISTRAL_API_KEY",
+  "KIMI_API_KEY",
+  "MOONSHOT_API_KEY",
+  "DEEPSEEK_API_KEY",
   "FIGGY_API_KEY",
   "APP_ENCRYPTION_KEY",
   "BETTER_AUTH_SECRET",
   "DATABASE_URL",
+  "PROPERTY_PRICER_MCP_TOKEN",
+  "MCP_PUBLIC_BASE_URL",
+  "MCP_REQUIRE_AUTH",
 ];
 
 const SCANNABLE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
@@ -78,18 +91,28 @@ function listFiles(dir) {
 export const SERVER_ONLY_ALLOWLIST = new Set(["src/lib/db.ts", "src/lib/auth/server.ts"]);
 
 /**
+ * Directories that are server-only by construction. `src/lib/mcp/` is the MCP
+ * server (every module asserts `assertApiServerOnly` at load); `src/routes/api/`
+ * are TanStack Start *server* routes (`server.handlers`, no React component), which
+ * are compiled out of the client bundle.
+ */
+const SERVER_ONLY_DIRS = ["src/lib/mcp/", "src/routes/api/"];
+
+/**
  * True when a file can end up in the client bundle.
  *
  * Excluded: `*.server.ts` (the repo's server-only convention), any file named
- * `server.ts`, the allowlist above, `server/` (Nitro middleware), generator output
- * (`routeTree.gen.ts`), and **test files** — a `*.test.ts` is never imported by a
- * route, so it can neither reach the bundle nor leak anything, and it legitimately
- * names vendor hosts in order to assert they are absent.
+ * `server.ts`, the allowlist above, the server-only directories above, `server/`
+ * (Nitro middleware), generator output (`routeTree.gen.ts`), and **test files** —
+ * a `*.test.ts` is never imported by a route, so it can neither reach the bundle
+ * nor leak anything, and it legitimately names vendor hosts in order to assert
+ * they are absent.
  */
 export function isClientBundled(relPath) {
   const normalized = relPath.split("\\").join("/");
   if (!normalized.startsWith("src/")) return false;
   if (SERVER_ONLY_ALLOWLIST.has(normalized)) return false;
+  if (SERVER_ONLY_DIRS.some((dir) => normalized.startsWith(dir))) return false;
   const base = normalized.slice(normalized.lastIndexOf("/") + 1);
   if (/\.(test|spec)\.tsx?$/.test(base)) return false;
   if (/\.server\.tsx?$/.test(base)) return false;

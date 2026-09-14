@@ -15,7 +15,7 @@ import {
  * Fixtures are built in a temp directory so the checks are proven to fail on a
  * violation — a guard that cannot fail is not a guard.
  */
-function makeFixture({ engineFiles, lockFiles, schema, copies }) {
+function makeFixture({ engineFiles, lockFiles, schema, copies, mcpSchema = "create table if not exists mcp_clients (id uuid primary key);\n", mcpCopies }) {
   const root = mkdtempSync(join(tmpdir(), "pp-locks-"));
   const appRoot = join(root, "app-react");
   const engineDir = join(appRoot, "src", "engine");
@@ -36,6 +36,18 @@ function makeFixture({ engineFiles, lockFiles, schema, copies }) {
   if (schema !== undefined) {
     mkdirSync(join(root, "db"), { recursive: true });
     writeFileSync(join(root, "db", "app-schema-v1.sql"), schema);
+    // A self-consistent MCP schema + copies so app-schema parity is the only
+    // thing these fixtures exercise.
+    writeFileSync(join(root, "db", "mcp-schema-v1.sql"), mcpSchema);
+    const mcpCopyMap = mcpCopies ?? {
+      "app-react/migrations/0003_mcp_gateway.sql": mcpSchema,
+      "app-react/public/mcp-schema-v1.sql": mcpSchema,
+    };
+    for (const [rel, body] of Object.entries(mcpCopyMap)) {
+      const target = join(root, rel);
+      mkdirSync(join(target, ".."), { recursive: true });
+      writeFileSync(target, body);
+    }
   }
   for (const [rel, body] of Object.entries(copies ?? {})) {
     const target = join(root, rel);
@@ -145,11 +157,28 @@ test("schema enum parity: a CHECK that disagrees with the app enum is reported",
   ].join("\n");
   const engineTypes = 'export type Persona = "listing" | "lender" | "investor" | "commercial";\n';
 
-  const { appRoot, root } = makeFixture({ schema });
+  const mcpSchema = [
+    "create table if not exists mcp_clients (",
+    "  client_type text not null check (client_type in ('chatgpt','claude','grok','mistral','kimi','deepseek','local','other')),",
+    ");",
+    "create table if not exists mcp_calls (",
+    "  status text not null check (status in ('succeeded','failed','rejected')),",
+    ");",
+    "",
+  ].join("\n");
+  const mcpSchemas = [
+    'export const MCP_CLIENT_TYPES = ["chatgpt", "claude", "grok", "mistral", "kimi", "deepseek", "local", "other"] as const;',
+    'export const MCP_CALL_STATUSES = ["succeeded", "failed", "rejected"] as const;',
+    "",
+  ].join("\n");
+
+  const { appRoot, root } = makeFixture({ schema, mcpSchema });
   // The fixture helper only writes engine/migration files, so place these by hand.
   mkdirSync(join(appRoot, "src", "lib", "api"), { recursive: true });
+  mkdirSync(join(appRoot, "src", "lib", "mcp"), { recursive: true });
   mkdirSync(join(appRoot, "src", "engine"), { recursive: true });
   writeFileSync(join(appRoot, "src", "lib", "api", "schemas.ts"), schemas);
+  writeFileSync(join(appRoot, "src", "lib", "mcp", "schemas.ts"), mcpSchemas);
   writeFileSync(join(appRoot, "src", "engine", "types.ts"), engineTypes);
 
   const violations = schemaEnumViolations(appRoot, root);

@@ -67,13 +67,13 @@ test("the auth schema ships outside the globbed directory", () => {
     "the auth schema must never be picked up by the globbed directory",
   );
   // The globbed directory holds exactly this app's own migrations — the SaaS
-  // schema added in `db/app-schema-v1.sql`. Anything else appearing here is an
-  // unreviewed schema change that the PGLite fallback and the deploy-time
-  // migrator would both apply.
+  // schema and the MCP gateway. Anything else appearing here is an unreviewed
+  // schema change that the PGLite fallback and the deploy-time migrator would
+  // both apply.
   assert.deepEqual(
     globbed,
-    ["0002_app_schema_v1.sql"],
-    "unexpected migration in the globbed directory — see db/app-schema-v1.sql",
+    ["0002_app_schema_v1.sql", "0003_mcp_gateway.sql"],
+    "unexpected migration in the globbed directory — see db/*-schema-v1.sql",
   );
 });
 

@@ -25,8 +25,15 @@ export type ChatRole = "system" | "user" | "assistant";
 
 export type ChatMessage = { role: ChatRole; content: string };
 
+/**
+ * Any vendor this server can call. The DB-constrained workspace enum is
+ * `AiProviderId` (four audited vendors); `kimi` and `deepseek` are extra,
+ * OpenAI-compatible endpoints the MCP layer may name via server env keys only.
+ */
+export type LlmProviderId = AiProviderId | "kimi" | "deepseek";
+
 export type ChatRequest = {
-  provider: AiProviderId;
+  provider: LlmProviderId;
   apiKey: string;
   /** Overrides the provider default; validated before use. */
   baseUrl?: string | null;
@@ -60,7 +67,7 @@ export class ProviderError extends Error {
 }
 
 type ProviderProfile = {
-  id: AiProviderId;
+  id: LlmProviderId;
   label: string;
   baseUrl: string;
   model: string;
@@ -74,8 +81,13 @@ type ProviderProfile = {
  * and wire dialect. This is the one place in the repo that names a provider
  * endpoint, which is why it is server-only — `scripts/check-no-client-secrets.mjs`
  * fails the build if a client-bundled file ever mentions one.
+ *
+ * `kimi` (Moonshot) and `deepseek` are OpenAI-compatible endpoints that the MCP
+ * surface exposes but which are **not** in the DB-constrained `ai_providers`
+ * enum — so a stored workspace provider can be any of the four audited vendors,
+ * while an MCP client may name these two extra ones using server env keys only.
  */
-function profile(id: AiProviderId, envKeys: string[]): ProviderProfile {
+function profile(id: LlmProviderId, envKeys: string[]): ProviderProfile {
   switch (id) {
     case "anthropic":
       return {
@@ -104,6 +116,24 @@ function profile(id: AiProviderId, envKeys: string[]): ProviderProfile {
         envKeys,
         dialect: "openai",
       };
+    case "kimi":
+      return {
+        id,
+        label: "Kimi (Moonshot)",
+        baseUrl: "https://api.moonshot.ai/v1",
+        model: "kimi-latest",
+        envKeys,
+        dialect: "openai",
+      };
+    case "deepseek":
+      return {
+        id,
+        label: "DeepSeek",
+        baseUrl: "https://api.deepseek.com/v1",
+        model: "deepseek-chat",
+        envKeys,
+        dialect: "openai",
+      };
     case "openai":
     default:
       return {
@@ -117,18 +147,20 @@ function profile(id: AiProviderId, envKeys: string[]): ProviderProfile {
   }
 }
 
-export const PROVIDER_PROFILES: Record<AiProviderId, ProviderProfile> = {
+export const PROVIDER_PROFILES: Record<LlmProviderId, ProviderProfile> = {
   openai: profile("openai", ["OPENAI_API_KEY"]),
   anthropic: profile("anthropic", ["ANTHROPIC_API_KEY", "CLAUDE_API_KEY"]),
   grok: profile("grok", ["GROK_API_KEY", "XAI_API_KEY"]),
   mistral: profile("mistral", ["MISTRAL_API_KEY"]),
+  kimi: profile("kimi", ["KIMI_API_KEY", "MOONSHOT_API_KEY"]),
+  deepseek: profile("deepseek", ["DEEPSEEK_API_KEY"]),
 };
 
-export function defaultBaseUrl(provider: AiProviderId): string {
+export function defaultBaseUrl(provider: LlmProviderId): string {
   return PROVIDER_PROFILES[provider].baseUrl;
 }
 
-export function defaultModel(provider: AiProviderId): string {
+export function defaultModel(provider: LlmProviderId): string {
   return PROVIDER_PROFILES[provider].model;
 }
 
@@ -137,7 +169,7 @@ export function defaultModel(provider: AiProviderId): string {
  * key in the database (useful on a single-tenant deploy); the browser is never
  * told the value — only that one resolved.
  */
-export function envApiKeyFor(provider: AiProviderId): string | null {
+export function envApiKeyFor(provider: LlmProviderId): string | null {
   for (const key of PROVIDER_PROFILES[provider].envKeys) {
     const value = env(key);
     if (value) return value;
@@ -145,7 +177,7 @@ export function envApiKeyFor(provider: AiProviderId): string | null {
   return null;
 }
 
-export function hasEnvKeyFor(provider: AiProviderId): boolean {
+export function hasEnvKeyFor(provider: LlmProviderId): boolean {
   return envApiKeyFor(provider) !== null;
 }
 
@@ -161,7 +193,7 @@ function redact(text: string, apiKey: string): string {
     .replace(/("?(?:api[_-]?key|authorization|x-api-key)"?\s*[:=]\s*"?)[^",}\s]{8,}/gi, "$1[redacted]");
 }
 
-function resolveEndpoint(baseUrl: string | null | undefined, provider: AiProviderId): string {
+function resolveEndpoint(baseUrl: string | null | undefined, provider: LlmProviderId): string {
   const raw = (baseUrl?.trim() || defaultBaseUrl(provider)).replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(raw)) {
     throw new ProviderError(

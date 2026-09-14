@@ -27,11 +27,27 @@ export const APP_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 export const REPO_ROOT = dirname(APP_ROOT);
 export const ENGINE_DIR = join(APP_ROOT, "src", "engine");
 export const ENGINE_LOCK_REL = "scripts/engine.lock.json";
-export const SCHEMA_SOURCE_REL = "db/app-schema-v1.sql";
-export const SCHEMA_COPIES_REL = [
-  "app-react/migrations/0002_app_schema_v1.sql",
-  "app-react/public/app-schema-v1.sql",
+
+/**
+ * Every reviewed DDL file and the runtime copies that must mirror it verbatim.
+ * The runtime applies the `migrations/` copy (PGLite fallback + Neon migrator);
+ * the `public/` copy is a downloadable reference. Drift means production runs a
+ * schema nobody reviewed.
+ */
+export const SCHEMA_SOURCES = [
+  {
+    source: "db/app-schema-v1.sql",
+    copies: ["app-react/migrations/0002_app_schema_v1.sql", "app-react/public/app-schema-v1.sql"],
+  },
+  {
+    source: "db/mcp-schema-v1.sql",
+    copies: ["app-react/migrations/0003_mcp_gateway.sql", "app-react/public/mcp-schema-v1.sql"],
+  },
 ];
+
+/** Legacy aliases used by older tests. */
+export const SCHEMA_SOURCE_REL = SCHEMA_SOURCES[0].source;
+export const SCHEMA_COPIES_REL = SCHEMA_SOURCES[0].copies;
 
 /** SHA-256 of a string, with newlines normalized so parity ignores line endings. */
 function sha256Text(value) {
@@ -155,30 +171,37 @@ function tsUnionValues(text, name) {
  */
 export function schemaEnumViolations(appRoot = APP_ROOT, repoRoot = REPO_ROOT) {
   const messages = [];
-  let sql;
+  let appSql;
+  let mcpSql;
   let schemas;
+  let mcpSchemas;
   let engineTypes;
   try {
-    sql = readFileSync(join(repoRoot, SCHEMA_SOURCE_REL), "utf8");
+    appSql = readFileSync(join(repoRoot, "db", "app-schema-v1.sql"), "utf8");
+    mcpSql = readFileSync(join(repoRoot, "db", "mcp-schema-v1.sql"), "utf8");
     schemas = readFileSync(join(appRoot, "src", "lib", "api", "schemas.ts"), "utf8");
+    mcpSchemas = readFileSync(join(appRoot, "src", "lib", "mcp", "schemas.ts"), "utf8");
     engineTypes = readFileSync(join(appRoot, "src", "engine", "types.ts"), "utf8");
   } catch (err) {
     return [`SCHEMA ENUM: could not read a source file (${err.code ?? err.message})`];
   }
 
-  /** Compare a DB CHECK against one or more TypeScript declarations. */
-  const compare = (label, column, expected, sources) => {
+  /**
+   * Compare a DB CHECK in one of the two schema files against one or more
+   * TypeScript declarations.
+   */
+  const compare = (label, column, expected, sources, sql = appSql, sqlFile = "db/app-schema-v1.sql") => {
     const fromSql = sqlCheckValues(sql, column);
     if (fromSql === null) {
       messages.push(
-        `SCHEMA ENUM: db/app-schema-v1.sql has no \`check (${column} in (…))\` constraint; ` +
+        `SCHEMA ENUM: ${sqlFile} has no \`check (${column} in (…))\` constraint; ` +
           `${label} is now unconstrained at the database level.`,
       );
       return;
     }
     if (fromSql.join(",") !== expected.join(",")) {
       messages.push(
-        `SCHEMA ENUM: ${column} CHECK in ${SCHEMA_SOURCE_REL} is [${fromSql.join(", ")}] but ` +
+        `SCHEMA ENUM: ${column} CHECK in ${sqlFile} is [${fromSql.join(", ")}] but ` +
           `${label} is [${expected.join(", ")}]. Update the DDL (and its copies) or the app enum.`,
       );
     }
@@ -212,6 +235,22 @@ export function schemaEnumViolations(appRoot = APP_ROOT, repoRoot = REPO_ROOT) {
   );
   compare("AI_PURPOSES", "purpose", tsArrayValues(schemas, "AI_PURPOSES") ?? [], []);
   compare("EXPORT_TYPES", "export_type", tsArrayValues(schemas, "EXPORT_TYPES") ?? [], []);
+  compare(
+    "MCP_CLIENT_TYPES",
+    "client_type",
+    tsArrayValues(mcpSchemas, "MCP_CLIENT_TYPES") ?? [],
+    [],
+    mcpSql,
+    "db/mcp-schema-v1.sql",
+  );
+  compare(
+    "MCP_CALL_STATUSES",
+    "status",
+    tsArrayValues(mcpSchemas, "MCP_CALL_STATUSES") ?? [],
+    [],
+    mcpSql,
+    "db/mcp-schema-v1.sql",
+  );
 
   return messages;
 }
@@ -219,29 +258,31 @@ export function schemaEnumViolations(appRoot = APP_ROOT, repoRoot = REPO_ROOT) {
 /** Violations of the single-source-of-truth schema contract. */
 export function schemaParityViolations(repoRoot = REPO_ROOT) {
   const messages = [];
-  let source;
-  try {
-    source = readFileSync(join(repoRoot, SCHEMA_SOURCE_REL));
-  } catch {
-    return [`SCHEMA: ${SCHEMA_SOURCE_REL} is missing — it is the reviewed DDL for the SaaS tables.`];
-  }
-  // Compared as normalized text, not raw bytes, for the same reason the engine
-  // lock is: a CRLF checkout must not read as schema drift.
-  const sourceHash = sha256Text(source.toString("utf8"));
-
-  for (const rel of SCHEMA_COPIES_REL) {
+  for (const { source: sourceRel, copies } of SCHEMA_SOURCES) {
+    let source;
     try {
-      const copy = readFileSync(join(repoRoot, rel));
-      const copyHash = sha256Text(copy.toString("utf8"));
-      if (copyHash !== sourceHash) {
-        messages.push(
-          `SCHEMA DRIFT: ${rel} differs from ${SCHEMA_SOURCE_REL}. ` +
-            "Copy the reviewed DDL verbatim (`node scripts/check-locks.mjs --sync-schema`) — " +
-            "the runtime applies the copy, so a mismatch means production runs an unreviewed schema.",
-        );
-      }
+      source = readFileSync(join(repoRoot, sourceRel));
     } catch {
-      messages.push(`SCHEMA DRIFT: ${rel} is missing; it must mirror ${SCHEMA_SOURCE_REL}.`);
+      messages.push(`SCHEMA: ${sourceRel} is missing — it is the reviewed DDL.`);
+      continue;
+    }
+    // Compared as normalized text, not raw bytes, for the same reason the engine
+    // lock is: a CRLF checkout must not read as schema drift.
+    const sourceHash = sha256Text(source.toString("utf8"));
+    for (const rel of copies) {
+      try {
+        const copy = readFileSync(join(repoRoot, rel));
+        const copyHash = sha256Text(copy.toString("utf8"));
+        if (copyHash !== sourceHash) {
+          messages.push(
+            `SCHEMA DRIFT: ${rel} differs from ${sourceRel}. ` +
+              "Copy the reviewed DDL verbatim (`node scripts/check-locks.mjs --sync-schema`) — " +
+              "the runtime applies the copy, so a mismatch means production runs an unreviewed schema.",
+          );
+        }
+      } catch {
+        messages.push(`SCHEMA DRIFT: ${rel} is missing; it must mirror ${sourceRel}.`);
+      }
     }
   }
   return messages;
@@ -272,17 +313,19 @@ function writeLock(appRoot = APP_ROOT) {
 }
 
 function syncSchema(repoRoot = REPO_ROOT) {
-  const source = readFileSync(join(repoRoot, SCHEMA_SOURCE_REL));
-  for (const rel of SCHEMA_COPIES_REL) {
-    const target = join(repoRoot, rel);
-    // Written only when the content differs, so mtimes stay meaningful.
-    try {
-      if (readFileSync(target).equals(source)) continue;
-    } catch {
-      /* fall through to write */
+  for (const { source: sourceRel, copies } of SCHEMA_SOURCES) {
+    const source = readFileSync(join(repoRoot, sourceRel));
+    for (const rel of copies) {
+      const target = join(repoRoot, rel);
+      // Written only when the content differs, so mtimes stay meaningful.
+      try {
+        if (readFileSync(target).equals(source)) continue;
+      } catch {
+        /* fall through to write */
+      }
+      writeFileSync(target, source);
+      console.log(`[locks] synced ${rel}`);
     }
-    writeFileSync(target, source);
-    console.log(`[locks] synced ${rel}`);
   }
 }
 

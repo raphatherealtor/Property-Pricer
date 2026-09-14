@@ -10,3 +10,13 @@
 import { register } from "node:module";
 
 register("./ts-resolve-hook.mjs", import.meta.url);
+
+// Tests run under Node, where the platform's Vite-only `import.meta.glob` DB
+// bootstrap (src/lib/db.ts) cannot work. That bootstrap fires as a module-load
+// side effect and rejects, which node --test reports as "asynchronous activity
+// after the test ended" even when every assertion passed. Pre-seeding its promise
+// keeps importing server modules harmless: modules that reach `getSql()` directly
+// still fail inside their own best-effort try/catch, but the load-time rejection
+// never happens.
+(globalThis).__pgBootstrapPromise__ = Promise.resolve();
+

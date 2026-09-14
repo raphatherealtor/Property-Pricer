@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
-import { Brain, HardDriveDownload, Landmark, Share2, X } from "lucide-react";
+import { Brain, HardDriveDownload, Landmark, Share2, Cable, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { EngineOutput } from "@/engine/types";
 import { cn } from "@/lib/utils";
 import { AiCopilot } from "./ai-copilot";
 import { CrmConnect } from "./crm-connect";
 import { InstallCard } from "./install-card";
+import { McpConnect } from "./mcp-connect";
 import { ScenarioLibrary } from "./scenario-library";
 
-type TabId = "scenarios" | "ai" | "crm" | "install";
+type TabId = "scenarios" | "ai" | "crm" | "mcp" | "install";
 
 const TABS: { id: TabId; label: string; icon: typeof Brain }[] = [
   { id: "scenarios", label: "Scenarios", icon: Landmark },
   { id: "ai", label: "AI", icon: Brain },
   { id: "crm", label: "CRM", icon: Share2 },
+  { id: "mcp", label: "MCP", icon: Cable },
   { id: "install", label: "Install", icon: HardDriveDownload },
 ];
 
@@ -109,6 +111,7 @@ export function CloudPanel({
           {tab === "scenarios" ? <ScenarioLibrary out={out} /> : null}
           {tab === "ai" ? <AiCopilot out={out} /> : null}
           {tab === "crm" ? <CrmConnect out={out} /> : null}
+          {tab === "mcp" ? <McpConnect /> : null}
           {tab === "install" ? <InstallCard /> : null}
         </div>
       </div>
