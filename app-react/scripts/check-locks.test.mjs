@@ -15,7 +15,7 @@ import {
  * Fixtures are built in a temp directory so the checks are proven to fail on a
  * violation — a guard that cannot fail is not a guard.
  */
-function makeFixture({ engineFiles, lockFiles, schema, copies, mcpSchema = "create table if not exists mcp_clients (id uuid primary key);\n", mcpCopies }) {
+function makeFixture({ engineFiles, lockFiles, schema, copies, mcpSchema = "create table if not exists mcp_clients (id uuid primary key);\n", mcpCopies, mcpOauthSchema = "create table if not exists mcp_oauth_clients (auth_method text not null check (auth_method in ('public_pkce','confidential_client')));\ncreate table if not exists mcp_oauth_codes (code_challenge_method text not null default 'S256' check (code_challenge_method in ('S256')));\ncreate table if not exists mcp_oauth_tokens (kind text not null check (kind in ('access','refresh')));\n", mcpOauthCopies }) {
   const root = mkdtempSync(join(tmpdir(), "pp-locks-"));
   const appRoot = join(root, "app-react");
   const engineDir = join(appRoot, "src", "engine");
@@ -44,6 +44,17 @@ function makeFixture({ engineFiles, lockFiles, schema, copies, mcpSchema = "crea
       "app-react/public/mcp-schema-v1.sql": mcpSchema,
     };
     for (const [rel, body] of Object.entries(mcpCopyMap)) {
+      const target = join(root, rel);
+      mkdirSync(join(target, ".."), { recursive: true });
+      writeFileSync(target, body);
+    }
+    // Same for the OAuth schema, so the third SCHEMA_SOURCES entry stays quiet.
+    writeFileSync(join(root, "db", "mcp-oauth-schema-v1.sql"), mcpOauthSchema);
+    const mcpOauthCopyMap = mcpOauthCopies ?? {
+      "app-react/migrations/0004_mcp_oauth.sql": mcpOauthSchema,
+      "app-react/public/mcp-oauth-schema-v1.sql": mcpOauthSchema,
+    };
+    for (const [rel, body] of Object.entries(mcpOauthCopyMap)) {
       const target = join(root, rel);
       mkdirSync(join(target, ".."), { recursive: true });
       writeFileSync(target, body);
@@ -169,6 +180,9 @@ test("schema enum parity: a CHECK that disagrees with the app enum is reported",
   const mcpSchemas = [
     'export const MCP_CLIENT_TYPES = ["chatgpt", "claude", "grok", "mistral", "kimi", "deepseek", "local", "other"] as const;',
     'export const MCP_CALL_STATUSES = ["succeeded", "failed", "rejected"] as const;',
+    'export const MCP_OAUTH_AUTH_METHODS = ["public_pkce", "confidential_client"] as const;',
+    'export const MCP_OAUTH_TOKEN_KINDS = ["access", "refresh"] as const;',
+    'export const MCP_OAUTH_PKCE_METHODS = ["S256"] as const;',
     "",
   ].join("\n");
 

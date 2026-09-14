@@ -23,12 +23,20 @@ import {
   MCP_PAYLOAD_TOO_LARGE,
   MCP_RATE_LIMITED,
   JSONRPC_INVALID_REQUEST,
+  forbidden,
 } from "./errors.ts";
 import { jsonContent } from "./registry.ts";
 import { tools } from "./tools.ts";
 import { resources, resourceTemplates, readResource } from "./resources.ts";
 import { prompts } from "./prompts.ts";
-import { toJsonSchema } from "./schemas.ts";
+import { toJsonSchema, type McpScope } from "./schemas.ts";
+import {
+  PROMPTS_SCOPE,
+  RESOURCES_SCOPE,
+  TOOLS_LIST_SCOPE,
+  missingScopes,
+  toolRequiredScopes,
+} from "./scopes.ts";
 
 assertApiServerOnly("mcp/server");
 
@@ -76,6 +84,15 @@ export function listMcpPrompts(): {
 /* ------------------------------------------------------------------ *
  * Dispatch
  * ------------------------------------------------------------------ */
+
+/** Human-readable reason when the caller's OAuth scopes deny an operation. */
+function scopeDenial(
+  ctx: Awaited<ReturnType<typeof resolveMcpContext>>,
+  required: readonly McpScope[],
+): string | null {
+  const missing = missingScopes(ctx, required);
+  return missing.length > 0 ? `Missing required scope(s): ${missing.join(", ")}` : null;
+}
 
 type RpcRequest = {
   jsonrpc?: string;
@@ -132,9 +149,15 @@ async function dispatchOne(ctx: Awaited<ReturnType<typeof resolveMcpContext>>, r
       await auditMcpCall(ctx, { status: "succeeded", request });
       return jsonRpcResult(id, {});
 
-    case "tools/list":
+    case "tools/list": {
+      const denial = scopeDenial(ctx, [TOOLS_LIST_SCOPE]);
+      if (denial) {
+        await auditMcpCall(ctx, { status: "rejected", error: denial, request });
+        return jsonRpcError(id, forbidden(denial));
+      }
       await auditMcpCall(ctx, { status: "succeeded", request });
       return jsonRpcResult(id, { tools: listMcpTools() });
+    }
 
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";
@@ -145,9 +168,15 @@ async function dispatchOne(ctx: Awaited<ReturnType<typeof resolveMcpContext>>, r
         return jsonRpcResult(id, { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true });
       }
       // Tools/call answers with content, not a JSON-RPC error, so the LLM reads
-      // the failure as a message. Rate limits and validation are still enforced.
+      // the failure as a message. Rate limits, scopes and validation are enforced.
       const limited = (message: string) =>
         jsonRpcResult(id, { content: [{ type: "text", text: message }], isError: true });
+
+      const denial = scopeDenial(ctx, toolRequiredScopes(tool.tier));
+      if (denial) {
+        await auditMcpCall(ctx, { toolName: name, status: "rejected", error: denial, request });
+        return limited(denial);
+      }
 
       try {
         mcpRateLimiter.consume(ctx.token ?? "anonymous", tool.tier);
@@ -182,9 +211,15 @@ async function dispatchOne(ctx: Awaited<ReturnType<typeof resolveMcpContext>>, r
       }
     }
 
-    case "resources/list":
+    case "resources/list": {
+      const denial = scopeDenial(ctx, [RESOURCES_SCOPE]);
+      if (denial) {
+        await auditMcpCall(ctx, { status: "rejected", error: denial, request });
+        return jsonRpcError(id, forbidden(denial));
+      }
       await auditMcpCall(ctx, { status: "succeeded", request });
       return jsonRpcResult(id, { resources: listMcpResources() });
+    }
 
     case "resources/templates/list":
       await auditMcpCall(ctx, { status: "succeeded", request });
@@ -193,6 +228,11 @@ async function dispatchOne(ctx: Awaited<ReturnType<typeof resolveMcpContext>>, r
     case "resources/read": {
       const uri = typeof params.uri === "string" ? params.uri : "";
       if (!uri) return fail(invalidParams("resources/read requires a uri"), "rejected");
+      const denial = scopeDenial(ctx, [RESOURCES_SCOPE]);
+      if (denial) {
+        await auditMcpCall(ctx, { resourceUri: uri, status: "rejected", error: denial, request });
+        return jsonRpcError(id, forbidden(denial));
+      }
       try {
         const content = await readResource(uri, ctx);
         await auditMcpCall(ctx, { resourceUri: uri, status: "succeeded", request, response: content });
@@ -205,15 +245,26 @@ async function dispatchOne(ctx: Awaited<ReturnType<typeof resolveMcpContext>>, r
       }
     }
 
-    case "prompts/list":
+    case "prompts/list": {
+      const denial = scopeDenial(ctx, [PROMPTS_SCOPE]);
+      if (denial) {
+        await auditMcpCall(ctx, { status: "rejected", error: denial, request });
+        return jsonRpcError(id, forbidden(denial));
+      }
       await auditMcpCall(ctx, { status: "succeeded", request });
       return jsonRpcResult(id, { prompts: listMcpPrompts() });
+    }
 
     case "prompts/get": {
       const name = typeof params.name === "string" ? params.name : "";
       const prompt = prompts.find((p) => p.name === name);
       if (!prompt) {
         return fail(new McpError(-32004, `Unknown prompt: ${name}`), "failed");
+      }
+      const denial = scopeDenial(ctx, [PROMPTS_SCOPE]);
+      if (denial) {
+        await auditMcpCall(ctx, { promptName: name, status: "rejected", error: denial, request });
+        return jsonRpcError(id, forbidden(denial));
       }
       const parsed = prompt.argumentsSchema.safeParse(params.arguments ?? {});
       if (!parsed.success) {

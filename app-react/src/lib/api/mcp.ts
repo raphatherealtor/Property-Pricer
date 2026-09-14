@@ -8,6 +8,8 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { cloudMiddleware } from "./context.ts";
+import { z } from "zod";
+import { MCP_OAUTH_SCOPES, type McpScope } from "./schemas.ts";
 import type { ClientPresetDto } from "../mcp/clients.ts";
 
 export type { ClientPresetDto };
@@ -95,6 +97,103 @@ export const listMcpClientPresets = createServerFn({ method: "POST" }).handler(
   },
 );
 
+/* ------------------------------------------------------------------ *
+ * OAuth 2.1 client registry (operator-managed, per workspace)
+ * ------------------------------------------------------------------ */
+
+export type OAuthClientDto = {
+  id: string;
+  clientId: string;
+  displayName: string;
+  authMethod: "public_pkce" | "confidential_client";
+  redirectUris: string[];
+  scopes: McpScope[];
+  isEnabled: boolean;
+  hasSecret: boolean;
+  createdAt: string;
+};
+
+function toOAuthClientDto(row: {
+  id: string;
+  client_id: string;
+  display_name: string;
+  auth_method: "public_pkce" | "confidential_client";
+  redirect_uris: string[];
+  scopes: string[];
+  is_enabled: boolean;
+  client_secret_hash: string | null;
+  created_at: unknown;
+}): OAuthClientDto {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    displayName: row.display_name,
+    authMethod: row.auth_method,
+    redirectUris: row.redirect_uris,
+    scopes: row.scopes.filter((s): s is McpScope => (MCP_OAUTH_SCOPES as readonly string[]).includes(s)),
+    isEnabled: row.is_enabled,
+    hasSecret: row.client_secret_hash != null,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+  };
+}
+
+export const listMcpOAuthClients = createServerFn({ method: "POST" })
+  .middleware([cloudMiddleware])
+  .handler(async ({ context }): Promise<OAuthClientDto[]> => {
+    const { workspaceFor, listOAuthClients } = await import("./store.server.ts");
+    const workspace = await workspaceFor(context);
+    const rows = await listOAuthClients(workspace);
+    return rows.map(toOAuthClientDto);
+  });
+
+export const registerMcpOAuthClient = createServerFn({ method: "POST" })
+  .middleware([cloudMiddleware])
+  .validator(
+    z.object({
+      displayName: z.string().trim().min(1).max(120),
+      authMethod: z.enum(["public_pkce", "confidential_client"]),
+      redirectUris: z.array(z.string().trim().min(1).max(500)).min(1).max(20),
+      scopes: z.array(z.enum(MCP_OAUTH_SCOPES)).min(1),
+    }),
+  )
+  .handler(
+    async ({
+      context,
+      data,
+    }): Promise<{ client: OAuthClientDto; clientSecret: string | null }> => {
+      const { workspaceFor, registerOAuthClient } = await import("./store.server.ts");
+      const { hashToken, randomClientId, randomClientSecret } = await import("../mcp/oauth.server.ts");
+      const workspace = await workspaceFor(context);
+
+      const clientId = randomClientId();
+      const clientSecret = data.authMethod === "confidential_client" ? randomClientSecret() : null;
+      const row = await registerOAuthClient({
+        workspaceId: workspace.workspaceId,
+        clientId,
+        clientSecretHash: clientSecret ? hashToken(clientSecret) : null,
+        displayName: data.displayName,
+        authMethod: data.authMethod,
+        redirectUris: data.redirectUris,
+        scopes: data.scopes,
+      });
+      return { client: toOAuthClientDto(row), clientSecret };
+    },
+  );
+
+export const deleteMcpOAuthClient = createServerFn({ method: "POST" })
+  .middleware([cloudMiddleware])
+  .validator((input: unknown): { id: string } => {
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("expected { id }");
+    const id = (input as { id?: unknown }).id;
+    if (typeof id !== "string" || id.length === 0) throw new Error("id is required");
+    return { id };
+  })
+  .handler(async ({ context, data }): Promise<boolean> => {
+    const { workspaceFor, deleteOAuthClient } = await import("./store.server.ts");
+    const workspace = await workspaceFor(context);
+    return deleteOAuthClient(workspace, data.id);
+  });
+
 /** Run a real price through the MCP tool path (server-side), from supplied inputs. */
 export const testMcpPriceScenario = createServerFn({ method: "POST" })
   .middleware([cloudMiddleware])
@@ -134,6 +233,7 @@ export const testMcpPriceScenario = createServerFn({ method: "POST" })
         clientType: "other",
         clientVersion: null,
         workspaceId: null,
+        scopes: null,
         getWorkspace: async () => null,
       } as Parameters<typeof tool.run>[1];
       const result = (await tool.run(parsed, ctx)) as {

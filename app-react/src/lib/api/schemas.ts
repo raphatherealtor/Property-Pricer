@@ -47,6 +47,20 @@ export const AI_PURPOSES = [
   "chat",
 ] as const;
 export const EXPORT_TYPES = ["json", "pdf", "deck", "crm_payload"] as const;
+
+/**
+ * Scopes the MCP OAuth authorization server issues and enforces (public labels,
+ * no secrets). Kept client-safe so the OAuth-client registration form can render
+ * them; `src/lib/mcp/schemas.ts` re-exports the same list for the server side.
+ */
+export const MCP_OAUTH_SCOPES = [
+  "mcp:tools",
+  "mcp:ai",
+  "mcp:crm",
+  "mcp:resources",
+  "mcp:prompts",
+] as const;
+export type McpScope = (typeof MCP_OAUTH_SCOPES)[number];
 export const LISTING_STATES = [
   "pre_listing",
   "active",

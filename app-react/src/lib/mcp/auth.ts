@@ -24,6 +24,7 @@ import { env } from "../env.server.ts";
 import type { WorkspaceContext } from "../api/store.server.ts";
 import { McpError, MCP_UNAUTHORIZED, unauthorized } from "./errors.ts";
 import type { McpContext } from "./context.ts";
+import { isSupportedScope } from "./scopes.ts";
 
 assertApiServerOnly("mcp/auth");
 
@@ -61,9 +62,8 @@ function bearerToken(headers: Headers): string | null {
  * missing or unknown. Everything else is a plain context, even when anonymous.
  */
 export async function resolveMcpContext(headers: Headers): Promise<McpContext> {
-  const { findMcpClientByTokenHash, workspaceFor, workspaceContextById } = await import(
-    "../api/store.server.ts"
-  );
+  const { findMcpClientByTokenHash, workspaceFor, workspaceContextById, findOAuthTokenByHash, findOAuthClientByClientId } =
+    await import("../api/store.server.ts");
 
   const requireAuth = mcpRequireAuth();
   const globalToken = mcpGlobalToken();
@@ -79,6 +79,7 @@ export async function resolveMcpContext(headers: Headers): Promise<McpContext> {
       clientType: null,
       clientVersion: null,
       workspaceId: null,
+      scopes: null,
       getWorkspace: async () => null,
     };
   }
@@ -96,6 +97,7 @@ export async function resolveMcpContext(headers: Headers): Promise<McpContext> {
       clientType: "other",
       clientVersion: null,
       workspaceId: null,
+      scopes: null,
       getWorkspace: async () => {
         memo ??= workspaceFor({
           userId: `mcp:${tokenHash}`,
@@ -116,28 +118,70 @@ export async function resolveMcpContext(headers: Headers): Promise<McpContext> {
     // not be trusted (and this keeps the lookup testable without a database).
     throw unauthorized("MCP client registry unavailable; token rejected.");
   }
-  if (!client) {
-    throw new McpError(
-      MCP_UNAUTHORIZED,
-      "Invalid MCP token. Set PROPERTY_PRICER_MCP_TOKEN, or register this token in " +
-        "the workspace (mcp_clients).",
-      undefined,
-      401,
-    );
+  if (client) {
+    let memo: Promise<WorkspaceContext | null> | null = null;
+    return {
+      token,
+      mode: "client",
+      clientId: client.id,
+      clientName: client.name,
+      clientType: client.client_type,
+      clientVersion: null,
+      workspaceId: client.workspace_id,
+      scopes: null,
+      getWorkspace: async () => {
+        memo ??= workspaceContextById(client.workspace_id);
+        return memo;
+      },
+    };
   }
 
-  let memo: Promise<WorkspaceContext | null> | null = null;
-  return {
-    token,
-    mode: "client",
-    clientId: client.id,
-    clientName: client.name,
-    clientType: client.client_type,
-    clientVersion: null,
-    workspaceId: client.workspace_id,
-    getWorkspace: async () => {
-      memo ??= workspaceContextById(client.workspace_id);
-      return memo;
-    },
-  };
+  // OAuth 2.1 access token issued by this app's authorization server.
+  let oauthToken = null as Awaited<ReturnType<typeof findOAuthTokenByHash>>;
+  try {
+    oauthToken = await findOAuthTokenByHash(tokenHash);
+  } catch {
+    throw unauthorized("MCP OAuth registry unavailable; token rejected.");
+  }
+  if (oauthToken) {
+    const expiresAt = new Date(oauthToken.expires_at as string | number | Date).getTime();
+    const valid =
+      oauthToken.kind === "access" &&
+      !oauthToken.revoked_at &&
+      Number.isFinite(expiresAt) &&
+      expiresAt > Date.now();
+    if (valid) {
+      let displayName = oauthToken.client_id;
+      try {
+        const oauthClient = await findOAuthClientByClientId(oauthToken.client_id);
+        if (oauthClient) displayName = oauthClient.display_name;
+      } catch {
+        /* attribution is best-effort */
+      }
+      let memo: Promise<WorkspaceContext | null> | null = null;
+      return {
+        token,
+        mode: "oauth",
+        clientId: null,
+        clientName: displayName,
+        clientType: "other",
+        clientVersion: null,
+        workspaceId: oauthToken.workspace_id,
+        scopes: oauthToken.scopes.filter(isSupportedScope),
+        getWorkspace: async () => {
+          if (!oauthToken.workspace_id) return null;
+          memo ??= workspaceContextById(oauthToken.workspace_id);
+          return memo;
+        },
+      };
+    }
+  }
+
+  throw new McpError(
+    MCP_UNAUTHORIZED,
+    "Invalid MCP token. Set PROPERTY_PRICER_MCP_TOKEN, register this token in " +
+      "the workspace (mcp_clients), or complete the OAuth flow (/oauth/authorize).",
+    undefined,
+    401,
+  );
 }

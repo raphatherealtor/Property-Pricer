@@ -186,8 +186,36 @@ is generated from the live tool/resource/prompt registry by
 
 **Auth** — `Authorization: Bearer <token>`. Accepted in order: no token (only when
 `MCP_REQUIRE_AUTH=false`), the global `PROPERTY_PRICER_MCP_TOKEN` (owns one
-deterministic workspace), or a per-client token hashed in `mcp_clients` (scoped to
-one workspace). Rejection happens before any tool runs.
+deterministic workspace), a per-client token hashed in `mcp_clients` (scoped to one
+workspace), or an OAuth 2.1 access token issued by this app's own authorization
+server. Rejection happens before any tool runs.
+
+**OAuth 2.1 authorization server** — the app is its own authorization server, so
+OAuth-only connectors (ChatGPT Custom Connector, Claude, …) can authenticate with
+PKCE instead of a shared token.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /.well-known/oauth-authorization-server` | RFC 8414 discovery (issuer, endpoints, `S256` PKCE, scopes). |
+| `GET /.well-known/oauth-protected-resource` | RFC 9728 — declares `/api/mcp` and its authorization server. |
+| `GET`/`POST /oauth/authorize` | Validate the request, render the **consent page**, redirect with a one-time code (or `access_denied`). |
+| `POST /oauth/token` | `authorization_code` + PKCE exchange, and `refresh_token` rotation. |
+| `POST /oauth/revoke` | RFC 7009 token revocation. |
+
+- **Clients** are registered per workspace in the Cloud → MCP panel (or the
+  `mcp_oauth_clients` table). A public client uses PKCE (no secret); a confidential
+  client gets a secret shown once, stored as a SHA-256 hash.
+- **Codes, access and refresh tokens** are opaque random strings stored only as
+  SHA-256 hashes; codes are one-time and 60 s, access tokens 1 h, refresh tokens
+  30 d (rotated on use). Revocation and client deletion are supported.
+- **Consent** renders server-side (`renderConsentHtml`) with escaped values; it
+  requires a signed-in user and re-validates the request before minting a code.
+- **Scope enforcement** — access tokens carry a scope claim
+  (`mcp:tools`/`mcp:ai`/`mcp:crm`/`mcp:resources`/`mcp:prompts`); the dispatcher
+  denies `tools/call`, `resources/read` and `prompts/get` when the token lacks the
+  required scope. Non-OAuth credentials carry `scopes: null` and keep full access.
+- All of it lives in `src/lib/mcp/oauth.server.ts` + `src/lib/mcp/scopes.ts`; the
+  DDL is `db/mcp-oauth-schema-v1.sql` (mirrored to `migrations/0004_mcp_oauth.sql`).
 
 **Tools** (15) — `price_scenario`, `validate_inputs`, `suggest_inputs_from_text`,
 `apply_input_patch`, `explain_math`, `save_scenario`, `load_scenario`,
@@ -213,9 +241,11 @@ token (in-process fixed window; per-instance on serverless).
 
 The admin panel lives in the **Cloud → MCP** tab: endpoint URL + copy buttons
 (Claude Desktop config, generic config, bridge instructions), per-platform
-onboarding cards (the nine presets, each with its own copy-paste setup), the tool
-list, a live smoke test through `price_scenario`, and the last ten calls. It never
-shows the token — only the `YOUR_MCP_TOKEN` placeholder.
+onboarding cards (the nine presets, each with its own copy-paste setup), an
+**OAuth clients** manager (register/revoke public-PKCE and confidential clients),
+the tool list, a live smoke test through `price_scenario`, and the last ten calls.
+It never shows the token or a client secret it did not just generate — only the
+`YOUR_MCP_TOKEN` placeholder.
 
 ---
 
@@ -246,6 +276,8 @@ untouched platform files remain — see below).
 | MCP tools / resources / prompts / dispatcher | `mcp:test` | 22 |
 | MCP contract (registry, auth, secrets, engine) | `mcp:test` | 11 |
 | MCP onboarding presets + OpenAPI 3.1 | `mcp:test` | 8 |
+| MCP OAuth 2.1 (PKCE, redirects, scopes, consent) | `mcp:test` | 8 |
+| MCP UI-action parity contract | `mcp:test` | 3 |
 | Platform src tests (pre-existing) | `test:src` (part) | 55 |
 
 **The enum-parity guard.** `check:locks` compares each Postgres `CHECK (col IN …)`

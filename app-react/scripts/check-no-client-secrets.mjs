@@ -92,11 +92,12 @@ export const SERVER_ONLY_ALLOWLIST = new Set(["src/lib/db.ts", "src/lib/auth/ser
 
 /**
  * Directories that are server-only by construction. `src/lib/mcp/` is the MCP
- * server (every module asserts `assertApiServerOnly` at load); `src/routes/api/`
- * are TanStack Start *server* routes (`server.handlers`, no React component), which
- * are compiled out of the client bundle.
+ * server (every module asserts `assertApiServerOnly` at load); `src/routes/api/`,
+ * `src/routes/oauth/` and `src/routes/[.]well-known/` are TanStack Start *server*
+ * routes (`server.handlers`, no React component), which are compiled out of the
+ * client bundle.
  */
-const SERVER_ONLY_DIRS = ["src/lib/mcp/", "src/routes/api/"];
+const SERVER_ONLY_DIRS = ["src/lib/mcp/", "src/routes/api/", "src/routes/oauth/", "src/routes/[.]well-known/"];
 
 /**
  * True when a file can end up in the client bundle.

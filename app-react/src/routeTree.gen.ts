@@ -10,7 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known/oauth-authorization-server'
+import { Route as DotwellKnownOauthProtectedResourceRouteImport } from './routes/[.]well-known/oauth-protected-resource'
 import { Route as ApiOpenapiDotjsonRouteImport } from './routes/api/openapi[.]json'
+import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
+import { Route as OauthRevokeRouteImport } from './routes/oauth/revoke'
+import { Route as OauthTokenRouteImport } from './routes/oauth/token'
 import { Route as ApiMcpIndexRouteImport } from './routes/api/mcp/index'
 import { Route as ApiMcpSplatRouteImport } from './routes/api/mcp/$'
 import { Route as ApiMcpMessagesRouteImport } from './routes/api/mcp/messages'
@@ -24,9 +29,36 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownOauthAuthorizationServerRoute =
+  DotwellKnownOauthAuthorizationServerRouteImport.update({
+    id: '/.well-known/oauth-authorization-server',
+    path: '/.well-known/oauth-authorization-server',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DotwellKnownOauthProtectedResourceRoute =
+  DotwellKnownOauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOpenapiDotjsonRoute = ApiOpenapiDotjsonRouteImport.update({
   id: '/api/openapi.json',
   path: '/api/openapi.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
+  id: '/oauth/authorize',
+  path: '/oauth/authorize',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthRevokeRoute = OauthRevokeRouteImport.update({
+  id: '/oauth/revoke',
+  path: '/oauth/revoke',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthTokenRoute = OauthTokenRouteImport.update({
+  id: '/oauth/token',
+  path: '/oauth/token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMcpIndexRoute = ApiMcpIndexRouteImport.update({
@@ -67,7 +99,12 @@ const ApiMcpClientsIdSetupRoute = ApiMcpClientsIdSetupRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
+  '/oauth/revoke': typeof OauthRevokeRoute
+  '/oauth/token': typeof OauthTokenRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
@@ -78,7 +115,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
+  '/oauth/revoke': typeof OauthRevokeRoute
+  '/oauth/token': typeof OauthTokenRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
@@ -90,7 +132,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
+  '/oauth/revoke': typeof OauthRevokeRoute
+  '/oauth/token': typeof OauthTokenRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
@@ -103,7 +150,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/api/openapi.json'
+    | '/oauth/authorize'
+    | '/oauth/revoke'
+    | '/oauth/token'
     | '/api/mcp/$'
     | '/api/mcp/messages'
     | '/api/mcp/sse'
@@ -114,7 +166,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/api/openapi.json'
+    | '/oauth/authorize'
+    | '/oauth/revoke'
+    | '/oauth/token'
     | '/api/mcp/$'
     | '/api/mcp/messages'
     | '/api/mcp/sse'
@@ -125,7 +182,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/api/openapi.json'
+    | '/oauth/authorize'
+    | '/oauth/revoke'
+    | '/oauth/token'
     | '/api/mcp/$'
     | '/api/mcp/messages'
     | '/api/mcp/sse'
@@ -137,7 +199,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
+  DotwellKnownOauthProtectedResourceRoute: typeof DotwellKnownOauthProtectedResourceRoute
   ApiOpenapiDotjsonRoute: typeof ApiOpenapiDotjsonRoute
+  OauthAuthorizeRoute: typeof OauthAuthorizeRoute
+  OauthRevokeRoute: typeof OauthRevokeRoute
+  OauthTokenRoute: typeof OauthTokenRoute
   ApiMcpSplatRoute: typeof ApiMcpSplatRoute
   ApiMcpMessagesRoute: typeof ApiMcpMessagesRoute
   ApiMcpSseRoute: typeof ApiMcpSseRoute
@@ -156,11 +223,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/oauth-authorization-server': {
+      id: '/.well-known/oauth-authorization-server'
+      path: '/.well-known/oauth-authorization-server'
+      fullPath: '/.well-known/oauth-authorization-server'
+      preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/openapi.json': {
       id: '/api/openapi.json'
       path: '/api/openapi.json'
       fullPath: '/api/openapi.json'
       preLoaderRoute: typeof ApiOpenapiDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/authorize': {
+      id: '/oauth/authorize'
+      path: '/oauth/authorize'
+      fullPath: '/oauth/authorize'
+      preLoaderRoute: typeof OauthAuthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/revoke': {
+      id: '/oauth/revoke'
+      path: '/oauth/revoke'
+      fullPath: '/oauth/revoke'
+      preLoaderRoute: typeof OauthRevokeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth/token': {
+      id: '/oauth/token'
+      path: '/oauth/token'
+      fullPath: '/oauth/token'
+      preLoaderRoute: typeof OauthTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/mcp/': {
@@ -217,7 +319,14 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DotwellKnownOauthAuthorizationServerRoute:
+    DotwellKnownOauthAuthorizationServerRoute,
+  DotwellKnownOauthProtectedResourceRoute:
+    DotwellKnownOauthProtectedResourceRoute,
   ApiOpenapiDotjsonRoute: ApiOpenapiDotjsonRoute,
+  OauthAuthorizeRoute: OauthAuthorizeRoute,
+  OauthRevokeRoute: OauthRevokeRoute,
+  OauthTokenRoute: OauthTokenRoute,
   ApiMcpSplatRoute: ApiMcpSplatRoute,
   ApiMcpMessagesRoute: ApiMcpMessagesRoute,
   ApiMcpSseRoute: ApiMcpSseRoute,

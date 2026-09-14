@@ -11,6 +11,7 @@ const anon: McpContext = {
   clientType: null,
   clientVersion: null,
   workspaceId: null,
+  scopes: null,
   getWorkspace: async () => null,
 };
 

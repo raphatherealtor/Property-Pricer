@@ -38,6 +38,20 @@ export const MCP_CLIENT_TYPES = [
 
 export const MCP_CALL_STATUSES = ["succeeded", "failed", "rejected"] as const;
 
+/** OAuth 2.1 client auth methods (mirrored by mcp_oauth_clients.auth_method). */
+export const MCP_OAUTH_AUTH_METHODS = ["public_pkce", "confidential_client"] as const;
+/** OAuth token kinds (mirrored by mcp_oauth_tokens.kind). */
+export const MCP_OAUTH_TOKEN_KINDS = ["access", "refresh"] as const;
+/** Supported PKCE code challenge methods (OAuth 2.1 forbids `plain`). */
+export const MCP_OAUTH_PKCE_METHODS = ["S256"] as const;
+
+/**
+ * The scopes the authorization server issues and the dispatcher enforces.
+ * Re-exported from the client-safe wire schema so the OAuth-client registration
+ * form renders the same list without importing a server module.
+ */
+export { MCP_OAUTH_SCOPES, type McpScope } from "../api/schemas.ts";
+
 /** LLM vendors an MCP tool may name. `none` means "deterministic, no LLM". */
 export const MCP_LLM_PROVIDERS = [
   "openai",

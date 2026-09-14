@@ -23,6 +23,7 @@ export const MCP_UNAUTHORIZED = -32001;
 export const MCP_RATE_LIMITED = -32002;
 export const MCP_PAYLOAD_TOO_LARGE = -32003;
 export const MCP_NOT_FOUND = -32004;
+export const MCP_FORBIDDEN = -32005;
 
 export class McpError extends Error {
   readonly code: number;
@@ -56,6 +57,10 @@ export function rateLimited(message = "Rate limit exceeded"): McpError {
 
 export function notFound(message: string): McpError {
   return new McpError(MCP_NOT_FOUND, message);
+}
+
+export function forbidden(message: string): McpError {
+  return new McpError(MCP_FORBIDDEN, message, undefined, 403);
 }
 
 /** Build a JSON-RPC 2.0 error response body for a request id. */

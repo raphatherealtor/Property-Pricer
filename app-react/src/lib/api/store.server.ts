@@ -1282,3 +1282,256 @@ export async function listRecentMcpCalls(
     limit ${limit}
   `;
 }
+
+/* ------------------------------------------------------------------ *
+ * MCP OAuth 2.1 authorization server (clients / codes / tokens)
+ * ------------------------------------------------------------------ */
+
+export type OAuthClientRow = {
+  id: string;
+  workspace_id: string | null;
+  client_id: string;
+  client_secret_hash: string | null;
+  display_name: string;
+  auth_method: "public_pkce" | "confidential_client";
+  redirect_uris: string[];
+  scopes: string[];
+  is_enabled: boolean;
+  created_at: unknown;
+};
+
+export type OAuthTokenRow = {
+  token_hash: string;
+  kind: "access" | "refresh";
+  client_id: string;
+  workspace_id: string | null;
+  user_id: string | null;
+  scopes: string[];
+  expires_at: unknown;
+  revoked_at: unknown;
+  created_at: unknown;
+};
+
+/** `text[]` may arrive pre-parsed (both drivers) or as a Postgres array literal. */
+function strArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((v) => String(v)).filter(Boolean);
+  if (typeof value === "string" && value) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map((v) => String(v)).filter(Boolean);
+    } catch {
+      /* not JSON — fall through */
+    }
+    return value
+      .replace(/^\{|\}$/g, "")
+      .split(",")
+      .map((s) => s.trim().replace(/^"|"$/g, ""))
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function toOAuthClientRow(row: Record<string, unknown>): OAuthClientRow {
+  return {
+    id: String(row.id),
+    workspace_id: str(row.workspace_id),
+    client_id: String(row.client_id),
+    client_secret_hash: str(row.client_secret_hash),
+    display_name: String(row.display_name ?? ""),
+    auth_method: row.auth_method === "confidential_client" ? "confidential_client" : "public_pkce",
+    redirect_uris: strArray(row.redirect_uris),
+    scopes: strArray(row.scopes),
+    is_enabled: row.is_enabled !== false,
+    created_at: row.created_at,
+  };
+}
+
+/** Register a new OAuth client. The client id/secret hash are produced by the caller. */
+export async function registerOAuthClient(args: {
+  workspaceId: string;
+  clientId: string;
+  clientSecretHash: string | null;
+  displayName: string;
+  authMethod: "public_pkce" | "confidential_client";
+  redirectUris: string[];
+  scopes: string[];
+}): Promise<OAuthClientRow> {
+  const sql = await getSql();
+  const rows = await sql<Record<string, unknown>>`
+    insert into mcp_oauth_clients (
+      workspace_id, client_id, client_secret_hash, display_name,
+      auth_method, redirect_uris, scopes, is_enabled
+    ) values (
+      ${args.workspaceId}::uuid,
+      ${args.clientId},
+      ${args.clientSecretHash},
+      ${args.displayName},
+      ${args.authMethod},
+      ${JSON.stringify(args.redirectUris)}::text[],
+      ${JSON.stringify(args.scopes)}::text[],
+      true
+    )
+    returning *
+  `;
+  if (!rows[0]) throw new Error("failed to register OAuth client");
+  return toOAuthClientRow(rows[0]);
+}
+
+export async function findOAuthClientByClientId(clientId: string): Promise<OAuthClientRow | null> {
+  const sql = await getSql();
+  const rows = await sql<Record<string, unknown>>`
+    select * from mcp_oauth_clients where client_id = ${clientId} limit 1
+  `;
+  return rows[0] ? toOAuthClientRow(rows[0]) : null;
+}
+
+export async function findOAuthClientById(id: string): Promise<OAuthClientRow | null> {
+  if (!isUuid(id)) return null;
+  const sql = await getSql();
+  const rows = await sql<Record<string, unknown>>`
+    select * from mcp_oauth_clients where id = ${id}::uuid limit 1
+  `;
+  return rows[0] ? toOAuthClientRow(rows[0]) : null;
+}
+
+export async function listOAuthClients(ctx: WorkspaceContext): Promise<OAuthClientRow[]> {
+  const sql = await getSql();
+  const rows = await sql<Record<string, unknown>>`
+    select * from mcp_oauth_clients
+    where workspace_id = ${ctx.workspaceId}
+    order by created_at desc
+  `;
+  return rows.map(toOAuthClientRow);
+}
+
+export async function deleteOAuthClient(ctx: WorkspaceContext, id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+  const sql = await getSql();
+  const rows = await sql<{ id: string }>`
+    delete from mcp_oauth_clients
+    where id = ${id}::uuid and workspace_id = ${ctx.workspaceId}
+    returning id
+  `;
+  return rows.length > 0;
+}
+
+/** Store a freshly minted authorization code (hashed), one-time and short-lived. */
+export async function insertOAuthCode(args: {
+  codeHash: string;
+  clientId: string;
+  workspaceId: string | null;
+  userId: string | null;
+  redirectUri: string;
+  codeChallenge: string;
+  codeChallengeMethod: string;
+  scopes: string[];
+  expiresAt: Date;
+}): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    insert into mcp_oauth_codes (
+      code_hash, client_id, workspace_id, user_id, redirect_uri,
+      code_challenge, code_challenge_method, scopes, expires_at
+    ) values (
+      ${args.codeHash},
+      ${args.clientId},
+      ${isUuid(args.workspaceId ?? undefined) ? args.workspaceId : null}::uuid,
+      ${isUuid(args.userId ?? undefined) ? args.userId : null}::uuid,
+      ${args.redirectUri},
+      ${args.codeChallenge},
+      ${args.codeChallengeMethod},
+      ${JSON.stringify(args.scopes)}::text[],
+      ${args.expiresAt}
+    )
+  `;
+}
+
+/**
+ * Atomically mark a code used and return it, or null when it is unknown, already
+ * used, or expired. The PKCE challenge is verified by the caller against this row.
+ */
+export async function consumeOAuthCode(codeHash: string): Promise<{
+  clientId: string;
+  workspaceId: string | null;
+  userId: string | null;
+  redirectUri: string;
+  codeChallenge: string;
+  codeChallengeMethod: string;
+  scopes: string[];
+} | null> {
+  const sql = await getSql();
+  const rows = await sql<{
+    client_id: string;
+    workspace_id: string | null;
+    user_id: string | null;
+    redirect_uri: string;
+    code_challenge: string;
+    code_challenge_method: string;
+    scopes: unknown;
+  }>`
+    update mcp_oauth_codes
+    set used_at = now()
+    where code_hash = ${codeHash} and used_at is null and expires_at > now()
+    returning client_id, workspace_id, user_id, redirect_uri, code_challenge, code_challenge_method, scopes
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    clientId: row.client_id,
+    workspaceId: row.workspace_id,
+    userId: row.user_id,
+    redirectUri: row.redirect_uri,
+    codeChallenge: row.code_challenge,
+    codeChallengeMethod: row.code_challenge_method,
+    scopes: strArray(row.scopes),
+  };
+}
+
+export async function insertOAuthToken(args: {
+  tokenHash: string;
+  kind: "access" | "refresh";
+  clientId: string;
+  workspaceId: string | null;
+  userId: string | null;
+  scopes: string[];
+  expiresAt: Date;
+}): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    insert into mcp_oauth_tokens (
+      token_hash, kind, client_id, workspace_id, user_id, scopes, expires_at
+    ) values (
+      ${args.tokenHash},
+      ${args.kind},
+      ${args.clientId},
+      ${isUuid(args.workspaceId ?? undefined) ? args.workspaceId : null}::uuid,
+      ${isUuid(args.userId ?? undefined) ? args.userId : null}::uuid,
+      ${JSON.stringify(args.scopes)}::text[],
+      ${args.expiresAt}
+    )
+  `;
+}
+
+export async function findOAuthTokenByHash(tokenHash: string): Promise<OAuthTokenRow | null> {
+  const sql = await getSql();
+  const rows = await sql<OAuthTokenRow>`
+    select token_hash, kind, client_id, workspace_id, user_id, scopes, expires_at, revoked_at, created_at
+    from mcp_oauth_tokens
+    where token_hash = ${tokenHash}
+    limit 1
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  return { ...row, scopes: strArray(row.scopes) };
+}
+
+export async function revokeOAuthToken(tokenHash: string): Promise<boolean> {
+  const sql = await getSql();
+  const rows = await sql<{ token_hash: string }>`
+    update mcp_oauth_tokens
+    set revoked_at = now()
+    where token_hash = ${tokenHash} and revoked_at is null
+    returning token_hash
+  `;
+  return rows.length > 0;
+}

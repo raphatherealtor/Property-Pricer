@@ -43,6 +43,10 @@ export const SCHEMA_SOURCES = [
     source: "db/mcp-schema-v1.sql",
     copies: ["app-react/migrations/0003_mcp_gateway.sql", "app-react/public/mcp-schema-v1.sql"],
   },
+  {
+    source: "db/mcp-oauth-schema-v1.sql",
+    copies: ["app-react/migrations/0004_mcp_oauth.sql", "app-react/public/mcp-oauth-schema-v1.sql"],
+  },
 ];
 
 /** Legacy aliases used by older tests. */
@@ -173,12 +177,14 @@ export function schemaEnumViolations(appRoot = APP_ROOT, repoRoot = REPO_ROOT) {
   const messages = [];
   let appSql;
   let mcpSql;
+  let mcpOauthSql;
   let schemas;
   let mcpSchemas;
   let engineTypes;
   try {
     appSql = readFileSync(join(repoRoot, "db", "app-schema-v1.sql"), "utf8");
     mcpSql = readFileSync(join(repoRoot, "db", "mcp-schema-v1.sql"), "utf8");
+    mcpOauthSql = readFileSync(join(repoRoot, "db", "mcp-oauth-schema-v1.sql"), "utf8");
     schemas = readFileSync(join(appRoot, "src", "lib", "api", "schemas.ts"), "utf8");
     mcpSchemas = readFileSync(join(appRoot, "src", "lib", "mcp", "schemas.ts"), "utf8");
     engineTypes = readFileSync(join(appRoot, "src", "engine", "types.ts"), "utf8");
@@ -250,6 +256,30 @@ export function schemaEnumViolations(appRoot = APP_ROOT, repoRoot = REPO_ROOT) {
     [],
     mcpSql,
     "db/mcp-schema-v1.sql",
+  );
+  compare(
+    "MCP_OAUTH_AUTH_METHODS",
+    "auth_method",
+    tsArrayValues(mcpSchemas, "MCP_OAUTH_AUTH_METHODS") ?? [],
+    [],
+    mcpOauthSql,
+    "db/mcp-oauth-schema-v1.sql",
+  );
+  compare(
+    "MCP_OAUTH_TOKEN_KINDS",
+    "kind",
+    tsArrayValues(mcpSchemas, "MCP_OAUTH_TOKEN_KINDS") ?? [],
+    [],
+    mcpOauthSql,
+    "db/mcp-oauth-schema-v1.sql",
+  );
+  compare(
+    "MCP_OAUTH_PKCE_METHODS",
+    "code_challenge_method",
+    tsArrayValues(mcpSchemas, "MCP_OAUTH_PKCE_METHODS") ?? [],
+    [],
+    mcpOauthSql,
+    "db/mcp-oauth-schema-v1.sql",
   );
 
   return messages;

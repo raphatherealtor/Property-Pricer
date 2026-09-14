@@ -10,10 +10,11 @@
 import type { WorkspaceContext } from "../api/store.server.ts";
 import { assertApiServerOnly } from "../api/server-only.ts";
 import { McpError, MCP_NOT_FOUND } from "./errors.ts";
+import type { McpScope } from "./schemas.ts";
 
 assertApiServerOnly("mcp/context");
 
-export type McpAuthMode = "none" | "global" | "client" | "anonymous";
+export type McpAuthMode = "none" | "global" | "client" | "oauth" | "anonymous";
 
 export type McpContext = {
   /** The presented bearer token, or null when auth is off. */
@@ -25,6 +26,11 @@ export type McpContext = {
   clientVersion: string | null;
   /** Fixed workspace id for per-client tokens; null otherwise. */
   workspaceId: string | null;
+  /**
+   * The OAuth scopes this token was granted, or `null` for every non-OAuth
+   * credential (global/static/anonymous), which retains full access.
+   */
+  scopes: McpScope[] | null;
   /** Materialize the workspace for this caller, or null when anonymous. */
   getWorkspace: () => Promise<WorkspaceContext | null>;
 };
