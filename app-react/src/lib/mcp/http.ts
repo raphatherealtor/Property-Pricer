@@ -8,7 +8,7 @@
  * REST bridge's documented shape.
  */
 import { assertApiServerOnly } from "../api/server-only.ts";
-import { handleMcpRequest, MAX_MCP_PAYLOAD_BYTES, NO_RESPONSE } from "./server.ts";
+import { handleMcpRequest, MAX_MCP_PAYLOAD_BYTES, NO_RESPONSE, type McpProfile } from "./server.ts";
 import { McpError, JSONRPC_PARSE_ERROR, jsonRpcError } from "./errors.ts";
 
 assertApiServerOnly("mcp/http");
@@ -25,9 +25,9 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
 }
 
 /** RFC 9728 discovery hint sent with every MCP authentication failure. */
-function oauthChallenge(request: Request): Record<string, string> {
+function oauthChallenge(request: Request, resourceMetadataPath: string): Record<string, string> {
   const origin = new URL(request.url).origin;
-  const metadata = `${origin}/.well-known/oauth-protected-resource`;
+  const metadata = `${origin}${resourceMetadataPath}`;
   return { "www-authenticate": `Bearer resource_metadata="${metadata}"` };
 }
 
@@ -49,10 +49,15 @@ async function readBody(request: Request): Promise<unknown> {
 }
 
 /** Streamable HTTP: POST /api/mcp — plain JSON (stateless) responses. */
-export async function handleMcpHttpRequest(request: Request): Promise<Response> {
+export async function handleMcpHttpRequest(
+  request: Request,
+  options: { profile?: McpProfile; resourceMetadataPath?: string } = {},
+): Promise<Response> {
+  const profile = options.profile ?? "full";
+  const resourceMetadataPath = options.resourceMetadataPath ?? "/.well-known/oauth-protected-resource";
   try {
     const body = await readBody(request);
-    const result = await handleMcpRequest(request.headers, body);
+    const result = await handleMcpRequest(request.headers, body, profile);
     if (result === NO_RESPONSE) {
       return new Response(null, { status: 202 });
     }
@@ -64,7 +69,7 @@ export async function handleMcpHttpRequest(request: Request): Promise<Response> 
         return jsonResponse(
           { ok: false, error: err.message },
           err.httpStatus,
-          err.httpStatus === 401 ? oauthChallenge(request) : {},
+          err.httpStatus === 401 ? oauthChallenge(request, resourceMetadataPath) : {},
         );
       }
       return jsonResponse(jsonRpcError(null, err));

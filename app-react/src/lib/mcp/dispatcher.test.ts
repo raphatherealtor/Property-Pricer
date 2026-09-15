@@ -60,6 +60,34 @@ test("tools/list returns the registry and tools/call prices through the engine",
   assert.match(call.result.structuredContent.inputHash, /^[0-9a-f]{8}$/);
 });
 
+test("the read-only profile exposes no mutation, AI, CRM, or export tools", async () => {
+  const list = (await handleMcpRequest(headers(), {
+    jsonrpc: "2.0",
+    id: 30,
+    method: "tools/list",
+  }, "read")) as { result: { tools: { name: string }[] } };
+  const names = list.result.tools.map((tool) => tool.name);
+
+  assert.deepEqual(names, [
+    "property_pricer.price_scenario",
+    "property_pricer.validate_inputs",
+    "property_pricer.suggest_inputs_from_text",
+    "property_pricer.explain_math",
+    "property_pricer.load_scenario",
+    "property_pricer.list_scenarios",
+    "property_pricer.compare_scenarios",
+  ]);
+
+  const blocked = (await handleMcpRequest(headers(), {
+    jsonrpc: "2.0",
+    id: 31,
+    method: "tools/call",
+    params: { name: "property_pricer.save_scenario", arguments: {} },
+  }, "read")) as { result: { isError?: boolean; content: { text: string }[] } };
+  assert.equal(blocked.result.isError, true);
+  assert.match(blocked.result.content[0].text, /Unknown tool/);
+});
+
 test("tools/call rejects an invalid persona with isError content, not a crash", async () => {
   const call = (await handleMcpRequest(headers(), {
     jsonrpc: "2.0",

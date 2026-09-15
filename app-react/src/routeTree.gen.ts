@@ -18,10 +18,12 @@ import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
 import { Route as OauthRegisterRouteImport } from './routes/oauth/register'
 import { Route as OauthRevokeRouteImport } from './routes/oauth/revoke'
 import { Route as OauthTokenRouteImport } from './routes/oauth/token'
+import { Route as DotwellKnownOauthProtectedResourceProRouteImport } from './routes/[.]well-known/oauth-protected-resource/pro'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiMcpIndexRouteImport } from './routes/api/mcp/index'
 import { Route as ApiMcpSplatRouteImport } from './routes/api/mcp/$'
 import { Route as ApiMcpMessagesRouteImport } from './routes/api/mcp/messages'
+import { Route as ApiMcpProRouteImport } from './routes/api/mcp/pro'
 import { Route as ApiMcpSseRouteImport } from './routes/api/mcp/sse'
 import { Route as ApiCrmFiggyWebhookRouteImport } from './routes/api/crm/figgy/webhook'
 import { Route as ApiMcpClientsPresetsRouteImport } from './routes/api/mcp/clients/presets'
@@ -74,6 +76,12 @@ const OauthTokenRoute = OauthTokenRouteImport.update({
   path: '/oauth/token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownOauthProtectedResourceProRoute =
+  DotwellKnownOauthProtectedResourceProRouteImport.update({
+    id: '/pro',
+    path: '/pro',
+    getParentRoute: () => DotwellKnownOauthProtectedResourceRoute,
+  } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -92,6 +100,11 @@ const ApiMcpSplatRoute = ApiMcpSplatRouteImport.update({
 const ApiMcpMessagesRoute = ApiMcpMessagesRouteImport.update({
   id: '/api/mcp/messages',
   path: '/api/mcp/messages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpProRoute = ApiMcpProRouteImport.update({
+  id: '/api/mcp/pro',
+  path: '/api/mcp/pro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMcpSseRoute = ApiMcpSseRouteImport.update({
@@ -119,15 +132,17 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
-  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRouteWithChildren
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/register': typeof OauthRegisterRoute
   '/oauth/revoke': typeof OauthRevokeRoute
   '/oauth/token': typeof OauthTokenRoute
+  '/.well-known/oauth-protected-resource/pro': typeof DotwellKnownOauthProtectedResourceProRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
+  '/api/mcp/pro': typeof ApiMcpProRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
   '/api/mcp/': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
@@ -138,15 +153,17 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
-  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRouteWithChildren
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/register': typeof OauthRegisterRoute
   '/oauth/revoke': typeof OauthRevokeRoute
   '/oauth/token': typeof OauthTokenRoute
+  '/.well-known/oauth-protected-resource/pro': typeof DotwellKnownOauthProtectedResourceProRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
+  '/api/mcp/pro': typeof ApiMcpProRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
   '/api/mcp': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
@@ -158,15 +175,17 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
-  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRouteWithChildren
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/register': typeof OauthRegisterRoute
   '/oauth/revoke': typeof OauthRevokeRoute
   '/oauth/token': typeof OauthTokenRoute
+  '/.well-known/oauth-protected-resource/pro': typeof DotwellKnownOauthProtectedResourceProRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mcp/$': typeof ApiMcpSplatRoute
   '/api/mcp/messages': typeof ApiMcpMessagesRoute
+  '/api/mcp/pro': typeof ApiMcpProRoute
   '/api/mcp/sse': typeof ApiMcpSseRoute
   '/api/mcp/': typeof ApiMcpIndexRoute
   '/api/crm/figgy/webhook': typeof ApiCrmFiggyWebhookRoute
@@ -185,9 +204,11 @@ export interface FileRouteTypes {
     | '/oauth/register'
     | '/oauth/revoke'
     | '/oauth/token'
+    | '/.well-known/oauth-protected-resource/pro'
     | '/api/auth/$'
     | '/api/mcp/$'
     | '/api/mcp/messages'
+    | '/api/mcp/pro'
     | '/api/mcp/sse'
     | '/api/mcp/'
     | '/api/crm/figgy/webhook'
@@ -204,9 +225,11 @@ export interface FileRouteTypes {
     | '/oauth/register'
     | '/oauth/revoke'
     | '/oauth/token'
+    | '/.well-known/oauth-protected-resource/pro'
     | '/api/auth/$'
     | '/api/mcp/$'
     | '/api/mcp/messages'
+    | '/api/mcp/pro'
     | '/api/mcp/sse'
     | '/api/mcp'
     | '/api/crm/figgy/webhook'
@@ -223,9 +246,11 @@ export interface FileRouteTypes {
     | '/oauth/register'
     | '/oauth/revoke'
     | '/oauth/token'
+    | '/.well-known/oauth-protected-resource/pro'
     | '/api/auth/$'
     | '/api/mcp/$'
     | '/api/mcp/messages'
+    | '/api/mcp/pro'
     | '/api/mcp/sse'
     | '/api/mcp/'
     | '/api/crm/figgy/webhook'
@@ -237,7 +262,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
-  DotwellKnownOauthProtectedResourceRoute: typeof DotwellKnownOauthProtectedResourceRoute
+  DotwellKnownOauthProtectedResourceRoute: typeof DotwellKnownOauthProtectedResourceRouteWithChildren
   ApiOpenapiDotjsonRoute: typeof ApiOpenapiDotjsonRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   OauthRegisterRoute: typeof OauthRegisterRoute
@@ -246,6 +271,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiMcpSplatRoute: typeof ApiMcpSplatRoute
   ApiMcpMessagesRoute: typeof ApiMcpMessagesRoute
+  ApiMcpProRoute: typeof ApiMcpProRoute
   ApiMcpSseRoute: typeof ApiMcpSseRoute
   ApiMcpIndexRoute: typeof ApiMcpIndexRoute
   ApiCrmFiggyWebhookRoute: typeof ApiCrmFiggyWebhookRoute
@@ -318,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/oauth-protected-resource/pro': {
+      id: '/.well-known/oauth-protected-resource/pro'
+      path: '/pro'
+      fullPath: '/.well-known/oauth-protected-resource/pro'
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceProRouteImport
+      parentRoute: typeof DotwellKnownOauthProtectedResourceRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -344,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/api/mcp/messages'
       fullPath: '/api/mcp/messages'
       preLoaderRoute: typeof ApiMcpMessagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp/pro': {
+      id: '/api/mcp/pro'
+      path: '/api/mcp/pro'
+      fullPath: '/api/mcp/pro'
+      preLoaderRoute: typeof ApiMcpProRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/mcp/sse': {
@@ -377,13 +417,28 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DotwellKnownOauthProtectedResourceRouteChildren {
+  DotwellKnownOauthProtectedResourceProRoute: typeof DotwellKnownOauthProtectedResourceProRoute
+}
+
+const DotwellKnownOauthProtectedResourceRouteChildren: DotwellKnownOauthProtectedResourceRouteChildren =
+  {
+    DotwellKnownOauthProtectedResourceProRoute:
+      DotwellKnownOauthProtectedResourceProRoute,
+  }
+
+const DotwellKnownOauthProtectedResourceRouteWithChildren =
+  DotwellKnownOauthProtectedResourceRoute._addFileChildren(
+    DotwellKnownOauthProtectedResourceRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   DotwellKnownOauthAuthorizationServerRoute:
     DotwellKnownOauthAuthorizationServerRoute,
   DotwellKnownOauthProtectedResourceRoute:
-    DotwellKnownOauthProtectedResourceRoute,
+    DotwellKnownOauthProtectedResourceRouteWithChildren,
   ApiOpenapiDotjsonRoute: ApiOpenapiDotjsonRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
   OauthRegisterRoute: OauthRegisterRoute,
@@ -392,6 +447,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiMcpSplatRoute: ApiMcpSplatRoute,
   ApiMcpMessagesRoute: ApiMcpMessagesRoute,
+  ApiMcpProRoute: ApiMcpProRoute,
   ApiMcpSseRoute: ApiMcpSseRoute,
   ApiMcpIndexRoute: ApiMcpIndexRoute,
   ApiCrmFiggyWebhookRoute: ApiCrmFiggyWebhookRoute,

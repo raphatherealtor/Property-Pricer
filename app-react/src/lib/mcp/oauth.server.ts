@@ -207,11 +207,15 @@ export function validateDynamicClientRegistration(body: unknown): DynamicClientR
   return { redirectUris, displayName: displayName || "MCP client", scopes: requestedScopes };
 }
 
-export function buildProtectedResourceMetadata(issuer: string): Record<string, unknown> {
+export function buildProtectedResourceMetadata(
+  issuer: string,
+  resourcePath = "/api/mcp",
+  scopes: readonly McpScope[] = MCP_OAUTH_SCOPES,
+): Record<string, unknown> {
   return {
-    resource: `${issuer}/api/mcp`,
+    resource: `${issuer}${resourcePath}`,
     authorization_servers: [issuer],
-    scopes_supported: [...MCP_OAUTH_SCOPES],
+    scopes_supported: [...scopes],
     bearer_methods_supported: ["header"],
   };
 }

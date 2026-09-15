@@ -46,23 +46,47 @@ export const SERVER_TITLE = "Property Pricer";
 export const SERVER_VERSION = "1.6.1";
 export const MAX_MCP_PAYLOAD_BYTES = 256 * 1024;
 
+/**
+ * ChatGPT Pro is limited to read/fetch MCP use. This profile intentionally
+ * excludes every persistent, AI-provider, CRM, and export-recording action.
+ */
+export type McpProfile = "full" | "read";
+
+const READ_ONLY_TOOL_NAMES = new Set([
+  "property_pricer.price_scenario",
+  "property_pricer.validate_inputs",
+  "property_pricer.suggest_inputs_from_text",
+  "property_pricer.explain_math",
+  "property_pricer.load_scenario",
+  "property_pricer.list_scenarios",
+  "property_pricer.compare_scenarios",
+]);
+
+function toolsForProfile(profile: McpProfile): typeof tools {
+  return profile === "read" ? tools.filter((tool) => READ_ONLY_TOOL_NAMES.has(tool.name)) : tools;
+}
+
 /** Marker returned for JSON-RPC notifications, which get no response. */
 export const NO_RESPONSE = Symbol("mcp.no-response");
 
-export function listToolNames(): string[] {
-  return tools.map((t) => t.name);
+export function listToolNames(profile: McpProfile = "full"): string[] {
+  return toolsForProfile(profile).map((tool) => tool.name);
 }
 
 export function listResourceUris(): string[] {
   return resources.map((r) => r.uri);
 }
 
-export function listMcpTools(): {
+export function listMcpTools(profile: McpProfile = "full"): {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
 }[] {
-  return tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+  return toolsForProfile(profile).map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+  }));
 }
 
 export function listMcpResources(): { uri: string; name: string; description: string; mimeType: string }[] {
@@ -109,7 +133,11 @@ function sizeOf(value: unknown): number {
   }
 }
 
-async function dispatchOne(ctx: Awaited<ReturnType<typeof resolveMcpContext>>, request: RpcRequest) {
+async function dispatchOne(
+  ctx: Awaited<ReturnType<typeof resolveMcpContext>>,
+  request: RpcRequest,
+  profile: McpProfile,
+) {
   const id = request.id;
   const method = request.method ?? "";
   const params = (request.params ?? {}) as Record<string, unknown>;
@@ -156,12 +184,12 @@ async function dispatchOne(ctx: Awaited<ReturnType<typeof resolveMcpContext>>, r
         return jsonRpcError(id, forbidden(denial));
       }
       await auditMcpCall(ctx, { status: "succeeded", request });
-      return jsonRpcResult(id, { tools: listMcpTools() });
+      return jsonRpcResult(id, { tools: listMcpTools(profile) });
     }
 
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";
-      const tool = tools.find((t) => t.name === name);
+      const tool = toolsForProfile(profile).find((candidate) => candidate.name === name);
       if (!tool) {
         // isError content, so the LLM reads the reason rather than a transport fault.
         await auditMcpCall(ctx, { toolName: name, status: "failed", error: `Unknown tool: ${name}`, request });
@@ -300,6 +328,7 @@ async function dispatchOne(ctx: Awaited<ReturnType<typeof resolveMcpContext>>, r
 export async function handleMcpRequest(
   headers: Headers,
   body: unknown,
+  profile: McpProfile = "full",
 ): Promise<unknown> {
   if (body !== undefined && sizeOf(body) > MAX_MCP_PAYLOAD_BYTES) {
     throw new McpError(MCP_PAYLOAD_TOO_LARGE, "MCP payload exceeds the size limit.", undefined, 413);
@@ -310,7 +339,7 @@ export async function handleMcpRequest(
   if (Array.isArray(body)) {
     const responses: unknown[] = [];
     for (const request of body as RpcRequest[]) {
-      const response = await dispatchOne(ctx, request);
+      const response = await dispatchOne(ctx, request, profile);
       if (response !== NO_RESPONSE) responses.push(response);
     }
     return responses;
@@ -320,5 +349,5 @@ export async function handleMcpRequest(
     return jsonRpcError(null, new McpError(JSONRPC_INVALID_REQUEST, "Invalid JSON-RPC request"));
   }
 
-  return dispatchOne(ctx, body as RpcRequest);
+  return dispatchOne(ctx, body as RpcRequest, profile);
 }
