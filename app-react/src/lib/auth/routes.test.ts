@@ -19,10 +19,11 @@ function readRel(rel: string): string {
   return readFileSync(join(srcRoot, rel), "utf8");
 }
 
-test("the /login route exists and renders the existing sign-in buttons", () => {
+test("the /login route exists and renders local email/password auth", () => {
   const login = readRel("routes/login.tsx");
   assert.match(login, /createFileRoute\("\/login"\)/);
-  assert.match(login, /SignInButtons/);
+  assert.match(login, /authClient\.signIn\.email/);
+  assert.match(login, /authClient\.signUp\.email/);
   assert.match(login, /useCurrentUserState/);
   assert.match(login, /Navigate/);
 });
