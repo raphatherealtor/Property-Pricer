@@ -91,7 +91,23 @@ export const authConfigured =
 // it derives the origin per-request from the (proxied) host, validated against the
 // preview allowlist, which makes the OAuth `redirect_uri` the concrete preview URL
 // the broker's preview client accepts.
-const explicitBaseURL = env("BETTER_AUTH_URL");
+const envOrigin = (...keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const value = env(key);
+    if (!value) continue;
+    return value.startsWith("http://") || value.startsWith("https://")
+      ? value.replace(/\/+$/, "")
+      : `https://${value.replace(/\/+$/, "")}`;
+  }
+  return undefined;
+};
+
+const explicitBaseURL = envOrigin(
+  "BETTER_AUTH_URL",
+  "MCP_PUBLIC_BASE_URL",
+  "VERCEL_PROJECT_PRODUCTION_URL",
+  "VERCEL_URL",
+);
 // Explicit `string[]` (not a readonly tuple) — Better Auth's DynamicBaseURLConfig
 // requires a mutable `allowedHosts: string[]`.
 const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];

@@ -34,6 +34,15 @@ test("the /api/auth catch-all forwards GET and POST to the Better Auth handler",
   assert.match(catchAll, /auth\.handler\(request\)/);
 });
 
+test("production public URL is accepted as a trusted auth origin", () => {
+  const server = readRel("lib/auth/server.ts");
+  assert.match(server, /envOrigin\(/);
+  assert.match(server, /"MCP_PUBLIC_BASE_URL"/);
+  assert.match(server, /"VERCEL_PROJECT_PRODUCTION_URL"/);
+  assert.match(server, /"VERCEL_URL"/);
+  assert.match(server, /const trustedOrigins: string\[\] = explicitBaseURL/);
+});
+
 test("the generated route tree wires both /login and /api/auth/$", () => {
   const tree = readRel("routeTree.gen.ts");
   assert.match(tree, /\/login/);
