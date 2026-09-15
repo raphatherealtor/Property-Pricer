@@ -204,7 +204,10 @@ PKCE instead of a shared token.
 
 - **Clients** are registered per workspace in the Cloud → MCP panel (or the
   `mcp_oauth_clients` table). A public client uses PKCE (no secret); a confidential
-  client gets a secret shown once, stored as a SHA-256 hash.
+  client gets a secret shown once, stored as a SHA-256 hash. Registration and the
+  consent page require a signed-in user: the app serves Better Auth at
+  `/api/auth/*` (catch-all in `src/routes/api/auth/$.ts`) with the sign-in page at
+  `/login` (`src/routes/login.tsx`).
 - **Codes, access and refresh tokens** are opaque random strings stored only as
   SHA-256 hashes; codes are one-time and 60 s, access tokens 1 h, refresh tokens
   30 d (rotated on use). Revocation and client deletion are supported.

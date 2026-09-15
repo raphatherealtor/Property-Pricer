@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Copy, Loader2, Play, Plus, RefreshCw, ShieldCheck, TerminalSquare, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePricer } from "@/store/pricer";
 import { describeApiError } from "@/lib/api/client-error";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { MCP_OAUTH_SCOPES, type McpScope } from "@/lib/api/schemas";
 import {
   deleteMcpOAuthClient,
@@ -34,6 +36,8 @@ export function McpConnect() {
   const investor = usePricer((s) => s.investor);
   const commercial = usePricer((s) => s.commercial);
   const persona = usePricer((s) => s.persona);
+  const { user: currentUser, isPending: authPending } = useCurrentUserState();
+  const signedOut = !currentUser && !authPending;
 
   const [status, setStatus] = useState<McpStatusDto | null>(null);
   const [calls, setCalls] = useState<McpCallDto[] | null>(null);
@@ -63,6 +67,16 @@ export function McpConnect() {
 
   const refresh = async () => {
     try {
+      // While the session is resolving, or once it is definitively signed out,
+      // the workspace-scoped server fns would 401 — load only the public presets.
+      if (authPending || signedOut) {
+        setPresets(await listMcpClientPresets());
+        setStatus(null);
+        setCalls(null);
+        setOAuthClients(null);
+        setError(null);
+        return;
+      }
       const [s, c, p, o] = await Promise.all([
         getMcpStatus(),
         listRecentMcpCalls(),
@@ -85,7 +99,9 @@ export function McpConnect() {
 
   useEffect(() => {
     void refresh();
-  }, []);
+    // Re-fetch once the sign-in state settles (signed-out <-> signed-in).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authPending, signedOut]);
 
   const copy = async (id: string, text: string) => {
     try {
@@ -337,6 +353,18 @@ export function McpConnect() {
         title="OAuth clients"
         hint="Register clients that authenticate with OAuth 2.1 (PKCE) — ChatGPT Custom Connector, Claude, etc. A confidential client's secret is shown once."
       >
+        {authPending ? (
+          <Muted>Loading session…</Muted>
+        ) : signedOut ? (
+          <Note tone="warn">
+            Sign in required — register and manage OAuth clients only when signed
+            in.{" "}
+            <Link to="/login" className="underline underline-offset-4">
+              Sign in
+            </Link>
+          </Note>
+        ) : (
+          <>
         {oauthClients === null ? (
           <Muted>Loading clients…</Muted>
         ) : oauthClients.length === 0 ? (
@@ -428,7 +456,7 @@ export function McpConnect() {
               <Button
                 size="sm"
                 variant="primary"
-                disabled={registering || !newClient.displayName.trim() || !newClient.redirectUris.trim()}
+                disabled={registering || signedOut || !newClient.displayName.trim() || !newClient.redirectUris.trim()}
                 onClick={() => void onRegisterClient()}
               >
                 {registering ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
@@ -442,6 +470,8 @@ export function McpConnect() {
             </div>
           </div>
         </div>
+          </>
+        )}
       </SaasSection>
 
       <SaasSection title="Enabled tools" hint="The full tool surface the MCP endpoint exposes.">
