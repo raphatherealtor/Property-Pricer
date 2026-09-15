@@ -31,6 +31,7 @@ assertApiServerOnly("mcp/oauth");
 export const OAUTH_AUTHORIZE_PATH = "/oauth/authorize";
 export const OAUTH_TOKEN_PATH = "/oauth/token";
 export const OAUTH_REVOKE_PATH = "/oauth/revoke";
+export const OAUTH_REGISTER_PATH = "/oauth/register";
 
 export const ACCESS_TOKEN_TTL_SECONDS = 3600;
 export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 3600;
@@ -157,6 +158,7 @@ export function buildAuthorizationServerMetadata(issuer: string): Record<string,
     authorization_endpoint: `${issuer}${OAUTH_AUTHORIZE_PATH}`,
     token_endpoint: `${issuer}${OAUTH_TOKEN_PATH}`,
     revocation_endpoint: `${issuer}${OAUTH_REVOKE_PATH}`,
+    registration_endpoint: `${issuer}${OAUTH_REGISTER_PATH}`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: [...MCP_OAUTH_PKCE_METHODS],
@@ -164,6 +166,45 @@ export function buildAuthorizationServerMetadata(issuer: string): Record<string,
     revocation_endpoint_auth_methods_supported: ["none", "client_secret_post", "client_secret_basic"],
     scopes_supported: [...MCP_OAUTH_SCOPES],
   };
+}
+
+export type DynamicClientRegistration = {
+  redirectUris: string[];
+  displayName: string;
+  scopes: McpScope[];
+};
+
+function isAllowedRedirectUri(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || url.hash) return false;
+    if (url.protocol === "https:") return true;
+    return url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]");
+  } catch {
+    return false;
+  }
+}
+
+/** Validate public-client dynamic registration without accepting unsafe callbacks. */
+export function validateDynamicClientRegistration(body: unknown): DynamicClientRegistration | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const input = body as Record<string, unknown>;
+  const redirectUris = Array.isArray(input.redirect_uris)
+    ? [...new Set(input.redirect_uris.filter((uri): uri is string => typeof uri === "string" && isAllowedRedirectUri(uri)))]
+    : [];
+  if (redirectUris.length === 0) return null;
+
+  const authMethod = input.token_endpoint_auth_method;
+  if (authMethod !== undefined && authMethod !== "none") return null;
+  const responseTypes = input.response_types;
+  if (responseTypes !== undefined && (!Array.isArray(responseTypes) || !responseTypes.includes("code"))) return null;
+  const grantTypes = input.grant_types;
+  if (grantTypes !== undefined && (!Array.isArray(grantTypes) || !grantTypes.includes("authorization_code"))) return null;
+
+  const requestedScopes = typeof input.scope === "string" ? parseScopeParam(input.scope) : [...MCP_OAUTH_SCOPES];
+  if (requestedScopes.length === 0) return null;
+  const displayName = typeof input.client_name === "string" ? input.client_name.trim().slice(0, 120) : "MCP client";
+  return { redirectUris, displayName: displayName || "MCP client", scopes: requestedScopes };
 }
 
 export function buildProtectedResourceMetadata(issuer: string): Record<string, unknown> {
@@ -404,6 +445,52 @@ async function loadClient(clientId: string | null): Promise<OAuthClientRow | nul
   }
 }
 
+/** POST /oauth/register — OAuth dynamic registration for public PKCE clients. */
+export async function handleOAuthRegister(request: Request): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "invalid_client_metadata" }, 400);
+  }
+  const registration = validateDynamicClientRegistration(body);
+  if (!registration) {
+    return jsonResponse({ error: "invalid_client_metadata" }, 400);
+  }
+
+  const store = await oauthStore();
+  if (!store) return jsonResponse({ error: "server_error" }, 500);
+
+  const clientId = randomClientId();
+  try {
+    await store.registerOAuthClient({
+      workspaceId: null,
+      clientId,
+      clientSecretHash: null,
+      displayName: registration.displayName,
+      authMethod: "public_pkce",
+      redirectUris: registration.redirectUris,
+      scopes: registration.scopes,
+    });
+  } catch {
+    return jsonResponse({ error: "server_error" }, 500);
+  }
+
+  return jsonResponse(
+    {
+      client_id: clientId,
+      client_id_issued_at: Math.floor(Date.now() / 1000),
+      client_name: registration.displayName,
+      redirect_uris: registration.redirectUris,
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none",
+      scope: registration.scopes.join(" "),
+    },
+    201,
+  );
+}
+
 /** GET /oauth/authorize — validate, then render the consent page. */
 export async function handleOAuthAuthorizeGet(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -509,12 +596,22 @@ export async function handleOAuthAuthorizePost(request: Request): Promise<Respon
     return htmlResponse(renderOAuthMessage("Server error", "The authorization store is unavailable."), 500);
   }
 
+  let workspaceId = client.workspace_id;
+  if (!workspaceId) {
+    try {
+      const workspace = await store.workspaceFor({ userId: user.id, userEmail: user.email });
+      workspaceId = workspace.workspaceId;
+    } catch {
+      return htmlResponse(renderOAuthMessage("Server error", "Could not resolve your Property Pricer workspace."), 500);
+    }
+  }
+
   const code = randomOpaque(32);
   try {
     await store.insertOAuthCode({
       codeHash: hashToken(code),
       clientId: client.client_id,
-      workspaceId: client.workspace_id,
+      workspaceId,
       userId: user.id,
       redirectUri: validation.redirectUri,
       codeChallenge: validation.codeChallenge,

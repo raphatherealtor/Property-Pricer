@@ -20,6 +20,7 @@ import {
   randomOpaque,
   redirectUriMatches,
   renderConsentHtml,
+  validateDynamicClientRegistration,
   validateAuthorizeRequest,
   verifyPkce,
 } from "@/lib/mcp/oauth.server";
@@ -126,6 +127,7 @@ test("discovery metadata advertises OAuth 2.1 + PKCE + the right scopes", () => 
   assert.equal(as.authorization_endpoint, "https://pricer.example/oauth/authorize");
   assert.equal(as.token_endpoint, "https://pricer.example/oauth/token");
   assert.equal(as.revocation_endpoint, "https://pricer.example/oauth/revoke");
+  assert.equal(as.registration_endpoint, "https://pricer.example/oauth/register");
   assert.deepEqual(as.code_challenge_methods_supported, ["S256"]);
   assert.deepEqual(as.grant_types_supported, ["authorization_code", "refresh_token"]);
   assert.deepEqual(as.scopes_supported, [...MCP_OAUTH_SCOPES]);
@@ -133,6 +135,25 @@ test("discovery metadata advertises OAuth 2.1 + PKCE + the right scopes", () => 
   const pr = buildProtectedResourceMetadata("https://pricer.example");
   assert.equal(pr.resource, "https://pricer.example/api/mcp");
   assert.deepEqual(pr.authorization_servers, ["https://pricer.example"]);
+});
+
+test("dynamic client registration accepts safe public PKCE callbacks only", () => {
+  const client = validateDynamicClientRegistration({
+    client_name: "ChatGPT",
+    redirect_uris: ["https://chatgpt.com/aip/abc/oauth/callback"],
+    response_types: ["code"],
+    grant_types: ["authorization_code", "refresh_token"],
+    token_endpoint_auth_method: "none",
+    scope: "mcp:tools mcp:resources",
+  });
+  assert.deepEqual(client, {
+    displayName: "ChatGPT",
+    redirectUris: ["https://chatgpt.com/aip/abc/oauth/callback"],
+    scopes: ["mcp:tools", "mcp:resources"],
+  });
+  assert.equal(validateDynamicClientRegistration({ redirect_uris: ["http://evil.example/cb"] }), null);
+  assert.equal(validateDynamicClientRegistration({ redirect_uris: ["https://client.example/cb#fragment"] }), null);
+  assert.equal(validateDynamicClientRegistration({ redirect_uris: ["https://client.example/cb"], token_endpoint_auth_method: "client_secret_post" }), null);
 });
 
 test("issuer prefers MCP_PUBLIC_BASE_URL and falls back to the request origin", () => {

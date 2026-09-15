@@ -24,6 +24,13 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
   });
 }
 
+/** RFC 9728 discovery hint sent with every MCP authentication failure. */
+function oauthChallenge(request: Request): Record<string, string> {
+  const origin = new URL(request.url).origin;
+  const metadata = `${origin}/.well-known/oauth-protected-resource`;
+  return { "www-authenticate": `Bearer resource_metadata="${metadata}"` };
+}
+
 async function readBody(request: Request): Promise<unknown> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declared) && declared > MAX_MCP_PAYLOAD_BYTES) {
@@ -54,7 +61,11 @@ export async function handleMcpHttpRequest(request: Request): Promise<Response> 
     if (err instanceof McpError) {
       if (err.httpStatus > 200) {
         // Transport-level fault (401/413/429): no JSON-RPC envelope, just status.
-        return jsonResponse({ ok: false, error: err.message }, err.httpStatus);
+        return jsonResponse(
+          { ok: false, error: err.message },
+          err.httpStatus,
+          err.httpStatus === 401 ? oauthChallenge(request) : {},
+        );
       }
       return jsonResponse(jsonRpcError(null, err));
     }

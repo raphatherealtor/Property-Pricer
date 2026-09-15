@@ -1355,7 +1355,7 @@ function toOAuthClientRow(row: Record<string, unknown>): OAuthClientRow {
 
 /** Register a new OAuth client. The client id/secret hash are produced by the caller. */
 export async function registerOAuthClient(args: {
-  workspaceId: string;
+  workspaceId: string | null;
   clientId: string;
   clientSecretHash: string | null;
   displayName: string;
@@ -1369,7 +1369,7 @@ export async function registerOAuthClient(args: {
       workspace_id, client_id, client_secret_hash, display_name,
       auth_method, redirect_uris, scopes, is_enabled
     ) values (
-      ${args.workspaceId}::uuid,
+      ${isUuid(args.workspaceId ?? undefined) ? args.workspaceId : null}::uuid,
       ${args.clientId},
       ${args.clientSecretHash},
       ${args.displayName},
