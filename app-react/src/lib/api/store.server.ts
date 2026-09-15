@@ -1331,6 +1331,13 @@ function strArray(value: unknown): string[] {
   return [];
 }
 
+/** Parameter value for `text[]` casts that works in both node-postgres and PGLite. */
+export function pgTextArrayLiteral(values: string[]): string {
+  return `{${values
+    .map((value) => `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
+    .join(",")}}`;
+}
+
 function toOAuthClientRow(row: Record<string, unknown>): OAuthClientRow {
   return {
     id: String(row.id),
@@ -1367,8 +1374,8 @@ export async function registerOAuthClient(args: {
       ${args.clientSecretHash},
       ${args.displayName},
       ${args.authMethod},
-      ${JSON.stringify(args.redirectUris)}::text[],
-      ${JSON.stringify(args.scopes)}::text[],
+      ${pgTextArrayLiteral(args.redirectUris)}::text[],
+      ${pgTextArrayLiteral(args.scopes)}::text[],
       true
     )
     returning *
