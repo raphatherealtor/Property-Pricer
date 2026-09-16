@@ -4,6 +4,7 @@
  * PKCE support and scopes from here.
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { MCP_CORS_HEADERS, mcpCorsPreflightResponse } from "@/lib/mcp/http";
 import { buildAuthorizationServerMetadata, oauthIssuer } from "@/lib/mcp/oauth.server";
 
 export const Route = createFileRoute("/.well-known/oauth-authorization-server")({
@@ -12,8 +13,9 @@ export const Route = createFileRoute("/.well-known/oauth-authorization-server")(
       GET: ({ request }) =>
         new Response(JSON.stringify(buildAuthorizationServerMetadata(oauthIssuer(request)), null, 2), {
           status: 200,
-          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...MCP_CORS_HEADERS },
         }),
+      OPTIONS: () => mcpCorsPreflightResponse(),
     },
   },
 });

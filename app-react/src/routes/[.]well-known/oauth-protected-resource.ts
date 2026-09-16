@@ -4,6 +4,7 @@
  * authorization server.
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { MCP_CORS_HEADERS, mcpCorsPreflightResponse } from "@/lib/mcp/http";
 import { buildProtectedResourceMetadata, oauthIssuer } from "@/lib/mcp/oauth.server";
 
 export const Route = createFileRoute("/.well-known/oauth-protected-resource")({
@@ -12,8 +13,9 @@ export const Route = createFileRoute("/.well-known/oauth-protected-resource")({
       GET: ({ request }) =>
         new Response(JSON.stringify(buildProtectedResourceMetadata(oauthIssuer(request)), null, 2), {
           status: 200,
-          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...MCP_CORS_HEADERS },
         }),
+      OPTIONS: () => mcpCorsPreflightResponse(),
     },
   },
 });

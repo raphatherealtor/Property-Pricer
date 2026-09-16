@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { handleMcpRequest } from "@/lib/mcp/server";
-import { handleMcpRestBridge } from "@/lib/mcp/http";
+import { handleMcpRestBridge, mcpCorsPreflightResponse } from "@/lib/mcp/http";
 import { resolveMcpContext } from "@/lib/mcp/auth";
 import { DEFAULT_INTAKE } from "@/engine/defaults";
 
@@ -29,6 +29,13 @@ afterEach(() => {
 function headers(token = TOKEN) {
   return new Headers({ authorization: `Bearer ${token}` });
 }
+
+test("browser clients can preflight MCP and read its OAuth challenge", () => {
+  const response = mcpCorsPreflightResponse();
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("access-control-allow-origin"), "*");
+  assert.match(response.headers.get("access-control-expose-headers") ?? "", /WWW-Authenticate/);
+});
 
 test("initialize negotiates the protocol and server info", async () => {
   const result = (await handleMcpRequest(headers(), {
