@@ -15,6 +15,7 @@ import {
   hashToken,
   oauthIssuer,
   OAUTH_OFFLINE_ACCESS_SCOPE,
+  oauthSignInLocation,
   pkceChallenge,
   randomClientId,
   randomClientSecret,
@@ -136,6 +137,16 @@ test("discovery metadata advertises OAuth 2.1 + PKCE + the right scopes", () => 
   const pr = buildProtectedResourceMetadata("https://pricer.example");
   assert.equal(pr.resource, "https://pricer.example/api/mcp");
   assert.deepEqual(pr.authorization_servers, ["https://pricer.example"]);
+});
+
+test("a signed-out OAuth request returns to the exact approval request after login", () => {
+  const location = oauthSignInLocation(
+    new Request("https://pricer.example/oauth/authorize?client_id=pp-client&state=return-here"),
+  );
+  assert.equal(
+    location,
+    "/login?returnTo=%2Foauth%2Fauthorize%3Fclient_id%3Dpp-client%26state%3Dreturn-here",
+  );
 });
 
 test("dynamic client registration accepts safe public PKCE callbacks only", () => {

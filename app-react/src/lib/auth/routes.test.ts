@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { safeAuthReturnTo } from "./return-to.ts";
 
 const srcRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -26,6 +27,13 @@ test("the /login route exists and renders local email/password auth", () => {
   assert.match(login, /authClient\.signUp\.email/);
   assert.match(login, /useCurrentUserState/);
   assert.match(login, /Navigate/);
+  assert.match(login, /returnTo/);
+});
+
+test("the login return target cannot leave Property Pricer", () => {
+  assert.equal(safeAuthReturnTo("/oauth/authorize?client_id=pp-client"), "/oauth/authorize?client_id=pp-client");
+  assert.equal(safeAuthReturnTo("https://evil.example"), "/");
+  assert.equal(safeAuthReturnTo("//evil.example"), "/");
 });
 
 test("the /api/auth catch-all forwards GET and POST to the Better Auth handler", () => {

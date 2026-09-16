@@ -9,13 +9,18 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, createFileRoute } from "@tanstack/react-router";
 import { authClient } from "@/lib/auth/client";
+import { safeAuthReturnTo } from "@/lib/auth/return-to";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    returnTo: safeAuthReturnTo(typeof search.returnTo === "string" ? search.returnTo : null),
+  }),
   component: LoginPage,
 });
 
 function LoginPage() {
+  const { returnTo } = Route.useSearch();
   const { user, isPending } = useCurrentUserState();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,7 +39,7 @@ function LoginPage() {
           ? await authClient.signIn.email({ email, password })
           : await authClient.signUp.email({ email, password, name });
       if (result.error) throw new Error(result.error.message ?? "Authentication failed");
-      window.location.href = "/";
+      window.location.href = returnTo;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {

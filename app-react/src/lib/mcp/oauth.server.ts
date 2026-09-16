@@ -221,6 +221,11 @@ export function buildProtectedResourceMetadata(
   };
 }
 
+export function oauthSignInLocation(request: Request): string {
+  const url = new URL(request.url);
+  return `/login?returnTo=${encodeURIComponent(`${url.pathname}${url.search}`)}`;
+}
+
 /* ------------------------------------------------------------------ *
  * Authorize request validation (pure)
  * ------------------------------------------------------------------ */
@@ -536,13 +541,7 @@ export async function handleOAuthAuthorizeGet(request: Request): Promise<Respons
   const { getSessionUser } = await import("../auth/verify.server.ts");
   const user = await getSessionUser().catch(() => null);
   if (!user) {
-    return htmlResponse(
-      renderOAuthMessage(
-        "Sign in required",
-        "You must be signed in to Property Pricer before approving a client. Sign in, then return to this authorization.",
-      ),
-      401,
-    );
+    return redirect(oauthSignInLocation(request));
   }
 
   return htmlResponse(
