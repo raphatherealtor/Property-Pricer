@@ -1447,7 +1447,7 @@ export async function insertOAuthCode(args: {
       ${args.redirectUri},
       ${args.codeChallenge},
       ${args.codeChallengeMethod},
-      ${JSON.stringify(args.scopes)}::text[],
+      ${pgTextArrayLiteral(args.scopes)}::text[],
       ${args.expiresAt}
     )
   `;
@@ -1513,7 +1513,7 @@ export async function insertOAuthToken(args: {
       ${args.clientId},
       ${isUuid(args.workspaceId ?? undefined) ? args.workspaceId : null}::uuid,
       ${isUuid(args.userId ?? undefined) ? args.userId : null}::uuid,
-      ${JSON.stringify(args.scopes)}::text[],
+      ${pgTextArrayLiteral(args.scopes)}::text[],
       ${args.expiresAt}
     )
   `;

@@ -11,4 +11,8 @@ test("pgTextArrayLiteral serializes values as a Postgres text[] literal", () => 
     ]),
     '{"https://chatgpt.com/aip/*/oauth/callback","https://chatgpt.com/connector_platform/oauth_redirect","quote\\"and\\\\slash"}',
   );
+  assert.equal(
+    pgTextArrayLiteral(["mcp:tools", "mcp:resources", "offline_access"]),
+    '{"mcp:tools","mcp:resources","offline_access"}',
+  );
 });
