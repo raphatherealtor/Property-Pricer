@@ -9,7 +9,7 @@
  * want to confirm the endpoint before initializing.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { handleMcpHttpRequest } from "@/lib/mcp/http";
+import { handleMcpHttpRequest, mcpCorsPreflightResponse, MCP_CORS_HEADERS } from "@/lib/mcp/http";
 import {
   MCP_PROTOCOL_VERSION,
   SERVER_NAME,
@@ -23,6 +23,7 @@ export const Route = createFileRoute("/api/mcp/")({
   server: {
     handlers: {
       POST: ({ request }) => handleMcpHttpRequest(request),
+      OPTIONS: () => mcpCorsPreflightResponse(),
       GET: () =>
         new Response(
           JSON.stringify(
@@ -41,7 +42,7 @@ export const Route = createFileRoute("/api/mcp/")({
           ),
           {
             status: 200,
-            headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+            headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...MCP_CORS_HEADERS },
           },
         ),
     },

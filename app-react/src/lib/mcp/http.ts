@@ -13,12 +13,31 @@ import { McpError, JSONRPC_PARSE_ERROR, jsonRpcError } from "./errors.ts";
 
 assertApiServerOnly("mcp/http");
 
+export const MCP_CORS_HEADERS: Readonly<Record<string, string>> = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "Authorization, Content-Type, MCP-Protocol-Version, MCP-Session-Id, Last-Event-ID",
+  "access-control-expose-headers": "WWW-Authenticate, MCP-Protocol-Version, MCP-Session-Id",
+  "access-control-max-age": "86400",
+};
+
+export function mcpCorsPreflightResponse(): Response {
+  return new Response(null, { status: 204, headers: MCP_CORS_HEADERS });
+}
+
+export function withMcpCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(MCP_CORS_HEADERS)) headers.set(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body, null, 2), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
+      ...MCP_CORS_HEADERS,
       ...headers,
     },
   });
@@ -59,7 +78,7 @@ export async function handleMcpHttpRequest(
     const body = await readBody(request);
     const result = await handleMcpRequest(request.headers, body, profile);
     if (result === NO_RESPONSE) {
-      return new Response(null, { status: 202 });
+      return withMcpCors(new Response(null, { status: 202 }));
     }
     return jsonResponse(result);
   } catch (err) {
@@ -145,7 +164,7 @@ export async function handleMcpRestBridge(request: Request, pathname: string): P
     }
 
     const result = await handleMcpRequest(request.headers, rpcRequest);
-    if (result === NO_RESPONSE) return new Response(null, { status: 202 });
+    if (result === NO_RESPONSE) return withMcpCors(new Response(null, { status: 202 }));
 
     // The dispatcher answers with a JSON-RPC envelope `{ jsonrpc, id, result }`.
     // The bridge exposes the documented shape directly — the `result`, not the

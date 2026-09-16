@@ -7,13 +7,14 @@
  * transform.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { handleMcpRestBridge } from "@/lib/mcp/http";
+import { handleMcpRestBridge, mcpCorsPreflightResponse } from "@/lib/mcp/http";
 
 export const Route = createFileRoute("/api/mcp/$")({
   server: {
     handlers: {
       GET: ({ request }) => handleMcpRestBridge(request, new URL(request.url).pathname),
       POST: ({ request }) => handleMcpRestBridge(request, new URL(request.url).pathname),
+      OPTIONS: () => mcpCorsPreflightResponse(),
     },
   },
 });
