@@ -32,6 +32,7 @@ export const OAUTH_AUTHORIZE_PATH = "/oauth/authorize";
 export const OAUTH_TOKEN_PATH = "/oauth/token";
 export const OAUTH_REVOKE_PATH = "/oauth/revoke";
 export const OAUTH_REGISTER_PATH = "/oauth/register";
+export const OAUTH_OFFLINE_ACCESS_SCOPE = "offline_access";
 
 export const ACCESS_TOKEN_TTL_SECONDS = 3600;
 export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 3600;
@@ -164,7 +165,7 @@ export function buildAuthorizationServerMetadata(issuer: string): Record<string,
     code_challenge_methods_supported: [...MCP_OAUTH_PKCE_METHODS],
     token_endpoint_auth_methods_supported: ["none", "client_secret_post", "client_secret_basic"],
     revocation_endpoint_auth_methods_supported: ["none", "client_secret_post", "client_secret_basic"],
-    scopes_supported: [...MCP_OAUTH_SCOPES],
+    scopes_supported: [...MCP_OAUTH_SCOPES, OAUTH_OFFLINE_ACCESS_SCOPE],
   };
 }
 

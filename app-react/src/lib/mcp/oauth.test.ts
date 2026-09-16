@@ -14,6 +14,7 @@ import {
   findMatchingRedirect,
   hashToken,
   oauthIssuer,
+  OAUTH_OFFLINE_ACCESS_SCOPE,
   pkceChallenge,
   randomClientId,
   randomClientSecret,
@@ -130,7 +131,7 @@ test("discovery metadata advertises OAuth 2.1 + PKCE + the right scopes", () => 
   assert.equal(as.registration_endpoint, "https://pricer.example/oauth/register");
   assert.deepEqual(as.code_challenge_methods_supported, ["S256"]);
   assert.deepEqual(as.grant_types_supported, ["authorization_code", "refresh_token"]);
-  assert.deepEqual(as.scopes_supported, [...MCP_OAUTH_SCOPES]);
+  assert.deepEqual(as.scopes_supported, [...MCP_OAUTH_SCOPES, OAUTH_OFFLINE_ACCESS_SCOPE]);
 
   const pr = buildProtectedResourceMetadata("https://pricer.example");
   assert.equal(pr.resource, "https://pricer.example/api/mcp");
