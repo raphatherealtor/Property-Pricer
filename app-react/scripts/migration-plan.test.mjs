@@ -69,7 +69,7 @@ test("the auth schema is copied into the deploy-time globbed directory", () => {
   // the PGLite fallback and the deploy-time migrator would both apply.
   assert.deepEqual(
     globbed,
-    ["0001_auth.sql", "0002_app_schema_v1.sql", "0003_mcp_gateway.sql", "0004_mcp_oauth.sql"],
+    ["0001_auth.sql", "0002_app_schema_v1.sql", "0003_mcp_gateway.sql", "0004_mcp_oauth.sql", "0005_figgy_oauth_client.sql"],
     "unexpected migration in the globbed directory — see db/*-schema-v1.sql",
   );
 });
