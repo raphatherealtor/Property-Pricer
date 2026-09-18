@@ -33,6 +33,8 @@ export const OAUTH_TOKEN_PATH = "/oauth/token";
 export const OAUTH_REVOKE_PATH = "/oauth/revoke";
 export const OAUTH_REGISTER_PATH = "/oauth/register";
 export const OAUTH_OFFLINE_ACCESS_SCOPE = "offline_access";
+export const FIGGY_OAUTH_CLIENT_ID = "346915229178-fd04fcv1rmftif76e540ut17qn81094i.apps.googleusercontent.com";
+export const FIGGY_NO_PKCE_CHALLENGE = "__figgy_no_pkce__";
 
 export const ACCESS_TOKEN_TTL_SECONDS = 3600;
 export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 3600;
@@ -243,6 +245,7 @@ export type AuthorizeValidation =
 export function validateAuthorizeRequest(
   params: { responseType: string | null; redirectUri: string | null; scope: string | null; codeChallenge: string | null; codeChallengeMethod: string | null; state: string | null },
   client: Pick<OAuthClientRow, "redirect_uris" | "scopes">,
+  options: { allowMissingPkce?: boolean } = {},
 ): AuthorizeValidation {
   if (params.responseType !== "code") {
     return { ok: false, error: "unsupported_response_type", errorDescription: "Only response_type=code is supported." };
@@ -267,7 +270,17 @@ export function validateAuthorizeRequest(
   if (!MCP_OAUTH_PKCE_METHODS.includes(method as (typeof MCP_OAUTH_PKCE_METHODS)[number])) {
     return { ok: false, error: "invalid_request", errorDescription: `code_challenge_method must be ${MCP_OAUTH_PKCE_METHODS.join(" or ")}.` };
   }
-  if (!params.codeChallenge || !/^[A-Za-z0-9._~-]{43,128}$/.test(params.codeChallenge)) {
+  const codeChallenge = params.codeChallenge ?? (options.allowMissingPkce ? FIGGY_NO_PKCE_CHALLENGE : null);
+  if (codeChallenge === FIGGY_NO_PKCE_CHALLENGE && options.allowMissingPkce) {
+    return {
+      ok: true,
+      redirectUri: params.redirectUri,
+      scopes: requested,
+      codeChallenge,
+      state: params.state,
+    };
+  }
+  if (!codeChallenge || !/^[A-Za-z0-9._~-]{43,128}$/.test(codeChallenge)) {
     return { ok: false, error: "invalid_request", errorDescription: "A valid code_challenge is required." };
   }
   return {
@@ -275,7 +288,7 @@ export function validateAuthorizeRequest(
     // The concrete URI the client sent (redirect back here, not to the pattern).
     redirectUri: params.redirectUri,
     scopes: requested,
-    codeChallenge: params.codeChallenge,
+    codeChallenge,
     state: params.state,
   };
 }
@@ -529,6 +542,7 @@ export async function handleOAuthAuthorizeGet(request: Request): Promise<Respons
       state: params.state,
     },
     client,
+    { allowMissingPkce: client.client_id === FIGGY_OAUTH_CLIENT_ID },
   );
   if (!validation.ok) {
     // Redirect only when the redirect_uri was validated; otherwise a plain error.
@@ -583,6 +597,7 @@ export async function handleOAuthAuthorizePost(request: Request): Promise<Respon
   const validation = validateAuthorizeRequest(
     { responseType: "code", redirectUri, scope, codeChallenge, codeChallengeMethod, state },
     client,
+    { allowMissingPkce: client.client_id === FIGGY_OAUTH_CLIENT_ID },
   );
 
   if (decision !== "approve" || !validation.ok) {
@@ -662,7 +677,8 @@ export async function handleOAuthToken(request: Request): Promise<Response> {
     const code = formValue(form, "code");
     const redirectUri = formValue(form, "redirect_uri");
     const verifier = formValue(form, "code_verifier");
-    if (!code || !redirectUri || !verifier) {
+    const figgyCompatibilityFlow = client.client_id === FIGGY_OAUTH_CLIENT_ID;
+    if (!code || !redirectUri || (!verifier && !figgyCompatibilityFlow)) {
       return jsonResponse({ error: "invalid_request", error_description: "code, redirect_uri and code_verifier are required." }, 400);
     }
 
@@ -670,7 +686,8 @@ export async function handleOAuthToken(request: Request): Promise<Response> {
     if (!consumed || consumed.clientId !== client.client_id || consumed.redirectUri !== redirectUri) {
       return jsonResponse({ error: "invalid_grant", error_description: "The authorization code is invalid or expired." }, 400);
     }
-    if (!verifyPkce(verifier, consumed.codeChallenge, consumed.codeChallengeMethod)) {
+    const skipsPkce = figgyCompatibilityFlow && consumed.codeChallenge === FIGGY_NO_PKCE_CHALLENGE;
+    if (!skipsPkce && !verifyPkce(verifier, consumed.codeChallenge, consumed.codeChallengeMethod)) {
       return jsonResponse({ error: "invalid_grant", error_description: "PKCE verification failed." }, 400);
     }
     return issueTokenResponse(store, client, consumed.workspaceId, consumed.userId, asMcpScopes(consumed.scopes));

@@ -11,6 +11,7 @@ import {
   buildAuthorizationServerMetadata,
   buildProtectedResourceMetadata,
   escapeHtml,
+  FIGGY_NO_PKCE_CHALLENGE,
   findMatchingRedirect,
   hashToken,
   oauthIssuer,
@@ -102,6 +103,10 @@ test("authorize-request validation accepts a valid request and rejects bad ones"
 
   const missing = validateAuthorizeRequest({ ...base, codeChallenge: null }, client);
   assert.equal(missing.ok, false);
+
+  const figgy = validateAuthorizeRequest({ ...base, codeChallenge: null }, client, { allowMissingPkce: true });
+  assert.equal(figgy.ok, true);
+  if (figgy.ok) assert.equal(figgy.codeChallenge, FIGGY_NO_PKCE_CHALLENGE);
 });
 
 test("scope parsing and enforcement honour OAuth scopes but not null (full access)", () => {
